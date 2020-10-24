@@ -1,0 +1,3 @@
+[submodule "pywsjtx"]
+	path = pywsjtx
+	url = https://github.com/bmo/py-wsjtx.git

@@ -5,7 +5,8 @@ import requests
 import re
 import random
 from datetime import datetime,timedelta
-
+from colorama import init
+from termcolor import colored
 
 class Listener:
     def __init__(self,ip_address,port,timeout=2.0):
@@ -22,6 +23,9 @@ class Listener:
         self.q.loadAdifFile(filepath)
         self.lastScan = datetime.now()
 
+    def loadLotw(self):
+        self.q.loadLotw()
+
     def scanLogFiles(self):
         now = datetime.now()
         if self.lastScan == None or (now - self.lastScan).total_seconds() > 120:
@@ -34,7 +38,7 @@ class Listener:
 
     def parse_packet(self):
         #print('decode packet ',self.the_packet)
-        m = re.match(r"^CQ\s+(\S+[0-9]+\S+)\s+", self.the_packet.message)
+        m = re.match(r"^CQ\s+(\S+[0-9]+\S+)(\s+|$)", self.the_packet.message)
         if m:
             #print("Callsign {}".format(m.group(1)))
             callsign = m.group(1)
@@ -42,27 +46,27 @@ class Listener:
 
             msg = callsign
             needData = self.q.needDataByBandAndCall(self.band,callsign)
-            if needData['newDx'] == True:
-                print("NEW DX ",callsign,needData['dx'])
-                bg=pywsjtx.QCOLOR.RGBA(255,240,240,255)
-                fg=pywsjtx.QCOLOR.Red()
+            if needData['newState'] == True:
+                print(colored("NEW STATE "+callsign+" "+needData['state'], 'green', 'on_white'))
+                bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
+                fg=pywsjtx.QCOLOR.Black()
+                self.ifttt_event('qso_was')
+            elif needData['newDx'] == True:
+                print(colored("NEW DX "+callsign+" "+str(needData['dx'])+" "+needData['country'], 'red', 'on_white'))
+                bg=pywsjtx.QCOLOR.Red()
+                fg=pywsjtx.QCOLOR.White()
                 self.ifttt_event('qso_dxcc')
-            elif needData['newState'] == True:
-                print("NEW STATE ",callsign,needData['state'])
+            elif needData['newCall'] == True:
+                print(colored("NEW CALL "+callsign+" "+needData['state']+" "+needData['country'], 'white', 'on_blue'))
                 bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
                 fg=pywsjtx.QCOLOR.White()
-                self.ifttt_event('qso_was')
-            elif needData['newCall'] == True:
-                print("NEW CALL ",callsign)
-                bg=pywsjtx.QCOLOR.White()
-                fg=pywsjtx.QCOLOR.Red()
                 msg = msg + ' NEW CALL'
             else:
                 bg=pywsjtx.QCOLOR.Uncolor()
                 fg=pywsjtx.QCOLOR.Uncolor()
                 msg = msg + '_'
 
-            color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, msg, bg, fg, True)
+            color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
             #normal_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, pywsjtx.QCOLOR.Uncolor(), pywsjtx.QCOLOR.Uncolor(), True)
             self.s.send_packet(self.addr_port, color_pkt)
 
@@ -87,8 +91,11 @@ class Listener:
 
     def update_status(self):
         #print('status ',self.the_packet)
-        bandinfo = freq_to_band(self.the_packet.dial_frequency/1000)
-        self.band = str(bandinfo['band'])+'M'
+        try:
+            bandinfo = freq_to_band(self.the_packet.dial_frequency/1000)
+            self.band = str(bandinfo['band'])+'M'
+        except Exception as e:
+            pass
 
     def handle_packet(self):
         if type(self.the_packet) == pywsjtx.HeartBeatPacket:
@@ -98,4 +105,11 @@ class Listener:
         elif self.band != None:
             if type(self.the_packet) == pywsjtx.DecodePacket:
                 self.parse_packet()
+        else:
+            print('unknown packet type',type(self.the_packet),self.the_packet)
+
+    def gui(self,mainWindow):
+        self.window = mainWindow
+        tv = Treeview(self.window)
+        tv['columns'] = ('One','Two')
 

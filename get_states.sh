@@ -7,5 +7,3 @@ cat EN.dat | cut -d \| -f 5,18 > ./call_state.dat
 python convert-callsigns.py
 touch last-callsign-update
 
-sh ./get_dxcc_data.sh
-

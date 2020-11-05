@@ -5,13 +5,18 @@ import requests
 import re
 import random
 from datetime import datetime,timedelta
-from colorama import init
+import pandas
 from termcolor import colored
+from logger import LOGGER as log
+
+
 
 class Listener:
     def __init__(self,ip_address,port,timeout=2.0):
+        log.debug('new listener')
         self.s = pywsjtx.extra.simple_server.SimpleServer(ip_address, port)
         self.band = None
+        self.lastReport = datetime.now()
         self.lastScan = None
         self.logfiles = []
         self.q = Qsos.Qsos()
@@ -36,28 +41,38 @@ class Listener:
     def ifttt_event(self,event):
         requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/bdbxyG4cyxYiVYelHCD2R')
 
+    def print_line(self):
+        now = datetime.now()
+        newLastReport = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
+        if (newLastReport-self.lastReport).total_seconds() >= 15:
+            log.info("------- "+str(newLastReport)+" -------")
+        self.lastReport = newLastReport
+
     def parse_packet(self):
         #print('decode packet ',self.the_packet)
+
         m = re.match(r"^CQ\s+(\S+[0-9]+\S+)(\s+|$)", self.the_packet.message)
         if m:
             #print("Callsign {}".format(m.group(1)))
             callsign = m.group(1)
             #print("CALL ",callsign,' on ',self.band)
 
+            self.print_line()
+
             msg = callsign
             needData = self.q.needDataByBandAndCall(self.band,callsign)
             if needData['newState'] == True:
-                print(colored("NEW STATE "+callsign+" "+needData['state'], 'green', 'on_white'))
+                log.info(colored("NEW STATE "+callsign+" "+needData['state'], 'green', 'on_white'))
                 bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
                 fg=pywsjtx.QCOLOR.Black()
                 self.ifttt_event('qso_was')
             elif needData['newDx'] == True:
-                print(colored("NEW DX "+callsign+" "+str(needData['dx'])+" "+needData['country'], 'red', 'on_white'))
+                log.info(colored("NEW DX "+callsign+" "+str(needData['dx'])+" "+needData['country'], 'red', 'on_white'))
                 bg=pywsjtx.QCOLOR.Red()
                 fg=pywsjtx.QCOLOR.White()
                 self.ifttt_event('qso_dxcc')
             elif needData['newCall'] == True:
-                print(colored("NEW CALL "+callsign+" "+needData['state']+" "+needData['country'], 'white', 'on_blue'))
+                log.info(colored("NEW CALL "+callsign+" "+needData['state']+" "+needData['country'], 'white', 'on_blue'))
                 bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
                 fg=pywsjtx.QCOLOR.White()
                 msg = msg + ' NEW CALL'

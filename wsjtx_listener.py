@@ -10,7 +10,6 @@ from termcolor import colored
 from logger import LOGGER as log
 
 
-
 class Listener:
     def __init__(self,ip_address,port,timeout=2.0):
         log.debug('new listener')
@@ -20,7 +19,8 @@ class Listener:
         self.lastScan = None
         self.logfiles = []
         self.q = Qsos.Qsos()
-        pass
+        self.unseen = []
+        self.stopped = False
 
     def addLogfile(self,filepath,rescan=False):
         if rescan:
@@ -61,6 +61,10 @@ class Listener:
 
             msg = callsign
             needData = self.q.needDataByBandAndCall(self.band,callsign)
+            needData['call'] = callsign
+            needData['cq'] = True
+            self.unseen.append(needData)
+
             if needData['newState'] == True:
                 log.info(colored("NEW STATE "+callsign+" "+needData['state'], 'green', 'on_white'))
                 bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
@@ -84,11 +88,28 @@ class Listener:
             color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
             #normal_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, pywsjtx.QCOLOR.Uncolor(), pywsjtx.QCOLOR.Uncolor(), True)
             self.s.send_packet(self.addr_port, color_pkt)
+        else:
+            m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+)", self.the_packet.message)
+            if m:
+                call1 = m.group(1)
+                call2 = m.group(2)
+                needData = self.q.needDataByBandAndCall(self.band,call1)
+                needData['call'] = call1
+                needData['cq'] = False
+                self.unseen.append(needData)
+                needData = self.q.needDataByBandAndCall(self.band,call2)
+                needData['call'] = call2
+                needData['cq'] = False
+                self.unseen.append(needData)
 
         pass
 
+    def stop(self):
+        log.debug("stopping wsjtx listener")
+        self.stopped = True
+
     def listen(self):
-        while True:
+        while not self.stopped:
             self.scanLogFiles()
 
             (self.pkt, self.addr_port) = self.s.rx_packet()
@@ -98,6 +119,8 @@ class Listener:
             self.pkt = None
             self.the_packet = None
             self.addr_port = None
+
+
 
     def heartbeat(self):
         max_schema = max(self.the_packet.max_schema, 3)
@@ -122,9 +145,4 @@ class Listener:
                 self.parse_packet()
         else:
             print('unknown packet type',type(self.the_packet),self.the_packet)
-
-    def gui(self,mainWindow):
-        self.window = mainWindow
-        tv = Treeview(self.window)
-        tv['columns'] = ('One','Two')
 

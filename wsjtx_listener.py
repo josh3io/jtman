@@ -1,5 +1,5 @@
-import Qsos
 import pywsjtx.extra.simple_server
+import threading
 from pyhamtools.utils import freq_to_band
 import requests
 import re
@@ -11,35 +11,36 @@ from logger import LOGGER as log
 
 
 class Listener:
-    def __init__(self,ip_address,port,timeout=2.0):
-        log.debug('new listener')
-        self.s = pywsjtx.extra.simple_server.SimpleServer(ip_address, port)
+    def __init__(self,q,config,ip_address,port,timeout=2.0):
+        log.debug('new listener: '+str(q))
+        self.config = config
         self.band = None
         self.lastReport = datetime.now()
         self.lastScan = None
         self.logfiles = []
-        self.q = Qsos.Qsos()
+        self.q = q
         self.unseen = []
         self.stopped = False
+        self.ifttt_key = self.config.get('OPTS','ifttt_key')
 
-    def addLogfile(self,filepath,rescan=False):
-        if rescan:
-            self.logfiles.append(filepath)
-        self.q.loadAdifFile(filepath)
-        self.lastScan = datetime.now()
+        self.initAdif()
+        self.s = pywsjtx.extra.simple_server.SimpleServer(ip_address, port)
 
-    def loadLotw(self):
-        self.q.loadLotw()
+    def initAdif(self):
+        filePaths = self.config.get('ADIF_FILES','paths').splitlines()
+        if self.config.get('OPTS','load_adif_files_on_start'):
+            for filepath in filePaths:
+                self.q.addAdifFile(filepath,True)
+            if self.config.get('LOTW','enable'):
+                username = self.config.get('LOTW','username')
+                password = self.config.get('LOTW','password')
+                if username and password:
+                    l.loadLotw()
 
-    def scanLogFiles(self):
-        now = datetime.now()
-        if self.lastScan == None or (now - self.lastScan).total_seconds() > 120:
-            for filepath in self.logfiles:
-                self.q.loadAdifFile(filepath)
-        self.lastScan = datetime.now()
 
     def ifttt_event(self,event):
-        requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/bdbxyG4cyxYiVYelHCD2R')
+        if self.ifttt_key:
+            requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+self.ifttt_key)
 
     def print_line(self):
         now = datetime.now()
@@ -51,10 +52,11 @@ class Listener:
     def parse_packet(self):
         #print('decode packet ',self.the_packet)
 
-        m = re.match(r"^CQ\s+(\S+[0-9]+\S+)(\s+|$)", self.the_packet.message)
+        m = re.match(r"^CQ\s(\w{2}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
         if m:
             #print("Callsign {}".format(m.group(1)))
-            callsign = m.group(1)
+            callsign = m.group(2)
+            grid = m.group(4)
             #print("CALL ",callsign,' on ',self.band)
 
             self.print_line()
@@ -62,6 +64,7 @@ class Listener:
             msg = callsign
             needData = self.q.needDataByBandAndCall(self.band,callsign)
             needData['call'] = callsign
+            needData['grid'] = grid
             needData['cq'] = True
             self.unseen.append(needData)
 
@@ -106,12 +109,12 @@ class Listener:
 
     def stop(self):
         log.debug("stopping wsjtx listener")
+        self.t.join()
         self.stopped = True
 
-    def listen(self):
-        while not self.stopped:
-            self.scanLogFiles()
 
+    def doListen(self):
+        while True:
             (self.pkt, self.addr_port) = self.s.rx_packet()
             if (self.pkt != None):
                 self.the_packet = pywsjtx.WSJTXPacketClassFactory.from_udp_packet(self.addr_port, self.pkt)
@@ -119,6 +122,10 @@ class Listener:
             self.pkt = None
             self.the_packet = None
             self.addr_port = None
+
+    def listen(self):
+        self.t = threading.Thread(target=self.doListen)
+        self.t.start()
 
 
 

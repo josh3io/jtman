@@ -16,7 +16,7 @@ def capitalize_keys(d):
 class Qsos:
     def __init__(self,adifFile=None,callStateFile="./call_state.dat"):
         self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
-        for band in ['160','80','40','30','20','17','15','10']:
+        for band in ['160','80','40','30','20','17','15','12','10','6','2']:
             self.qso['bands'][band+'M'] = {'dxcc':{},'states':{},'calls':{}}
 
         self.loadCountryData()

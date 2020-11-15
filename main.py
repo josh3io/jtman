@@ -21,7 +21,8 @@ q = Qsos.Qsos()
 q.startScan()
 
 # set env GUI to zero, or env GUI is unset and GUI disabled in config
-if not os.getenv('GUI') and not config.get('OPTS','gui'):
+print("GUI",os.getenv('GUI'),config.get('OPTS','gui'))
+if os.getenv('GUI') != 0 and not config.get('OPTS','gui'):
     threads=[]
     listeners=[]
     for lconfig in self.config.get('LISTENERS','addrs').splitlines():

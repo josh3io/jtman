@@ -22,6 +22,8 @@ class Listener:
         self.unseen = []
         self.stopped = False
         self.ifttt_key = self.config.get('OPTS','ifttt_key')
+        self.ip_address = ip_address
+        self.port = port
 
         self.initAdif()
         self.s = pywsjtx.extra.simple_server.SimpleServer(ip_address, port)
@@ -69,7 +71,7 @@ class Listener:
             self.unseen.append(needData)
 
             if needData['newState'] == True:
-                log.info(colored("NEW STATE "+callsign+" "+needData['state'], 'green', 'on_white'))
+                log.info(colored("NEW STATE "+callsign+" "+needData['state'], 'magenta', 'on_white'))
                 bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
                 fg=pywsjtx.QCOLOR.Black()
                 self.ifttt_event('qso_was')
@@ -125,6 +127,7 @@ class Listener:
 
     def listen(self):
         self.t = threading.Thread(target=self.doListen)
+        log.info("Listener started "+self.ip_address+":"+str(self.port))
         self.t.start()
 
 

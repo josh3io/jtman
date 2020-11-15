@@ -45,9 +45,8 @@ class Main(tk.Frame):
 
     def updateButton(self,idx,data):
         if data == None:
-            log.info("clear button "+str(idx))
             self.buttons[idx].config(text="         ")
-            self.buttons[idx].config(bg=None)
+            self.buttons[idx].config(bg="grey")
         else:
             log.info("update button "+str(idx)+" with call "+data['call'])
             self.buttons[idx].config(text=data['call'].upper())
@@ -111,7 +110,7 @@ class Main(tk.Frame):
             maxIdx = self.rowcount * self.columncount
             while len(listener.unseen) > 0 and buttonIdx < maxIdx:
                 data = listener.unseen.pop(0)
-                log.debug("listener check "+str(buttonIdx)+"; "+str(data))
+                log.info("listener check "+str(buttonIdx)+"; "+str(data))
                 self.updateButton(buttonIdx,data)
                 buttonIdx += 1
             while buttonIdx < maxIdx:

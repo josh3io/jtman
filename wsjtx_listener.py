@@ -51,6 +51,10 @@ class Listener:
             log.info("------- "+str(newLastReport)+" -------")
         self.lastReport = newLastReport
 
+    def send_reply(self,data):
+        packet = pywsjtx.ReplyPacket.Builder(data['packet'])
+        self.s.send_packet(data['addr_port'], packet)
+
     def parse_packet(self):
         #print('decode packet ',self.the_packet)
 
@@ -68,6 +72,8 @@ class Listener:
             needData['call'] = callsign
             needData['grid'] = grid
             needData['cq'] = True
+            needData['packet'] = self.the_packet
+            needData['addr_port'] = self.addr_port
             self.unseen.append(needData)
 
             if needData['newState'] == True:
@@ -91,7 +97,6 @@ class Listener:
                 msg = msg + '_'
 
             color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
-            #normal_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, pywsjtx.QCOLOR.Uncolor(), pywsjtx.QCOLOR.Uncolor(), True)
             self.s.send_packet(self.addr_port, color_pkt)
         else:
             m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+)", self.the_packet.message)
@@ -111,12 +116,14 @@ class Listener:
 
     def stop(self):
         log.debug("stopping wsjtx listener")
-        self.t.join()
         self.stopped = True
+        self.t.join()
 
 
     def doListen(self):
         while True:
+            if self.stopped:
+                break
             (self.pkt, self.addr_port) = self.s.rx_packet()
             if (self.pkt != None):
                 self.the_packet = pywsjtx.WSJTXPacketClassFactory.from_udp_packet(self.addr_port, self.pkt)

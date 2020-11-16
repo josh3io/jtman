@@ -43,22 +43,29 @@ class Main(tk.Frame):
 
         self.parent.config(menu=self.menu)
 
-    def updateButton(self,idx,data):
+
+    def updateButton(self,idx,listener,data):
         if data == None:
-            self.buttons[idx].config(text="         ")
+            self.buttons[idx].config(text="             ")
             self.buttons[idx].config(bg="grey")
         else:
             log.info("update button "+str(idx)+" with call "+data['call'])
-            self.buttons[idx].config(text=data['call'].upper())
+            text = data['call'].upper()
 
             if data['cq']:
+                text = '* '+text
                 self.buttons[idx].config(bg=self.cqcolor)
                 if data['newState']:
                     self.buttons[idx].config(bg=self.stcolor)
+                    text = text + " - " + data['state']
                 elif data['newDx']:
                     self.buttons[idx].config(bg=self.dxcolor)
+                    text = text + " - " + data['country']
+                cmd = lambda: listener.send_reply(data)
+                self.buttons[idx].config(command=cmd)
             else:
-                self.buttons[idx].config(bg=None)
+                self.buttons[idx].config(bg='grey')
+            self.buttons[idx].config(text=text)
                 
             
 
@@ -72,11 +79,6 @@ class Main(tk.Frame):
 
         self.rows = [None] * self.rowcount
         self.buttons = [None] * self.rowcount * self.columncount
-        def fact(idx,txt):
-            def f():
-                self.textInfo.config(text=self.info + " | " + str(idx) + " | "+str(txt))
-                self.buttons[idx].config(text=txt)
-            return f
 
         for r in range(self.rowcount):
             rowpane = tk.PanedWindow(self.gridpane)
@@ -85,8 +87,7 @@ class Main(tk.Frame):
             self.rows[r] = rowpane
             for c in range(self.columncount):
                 idx = r*self.columncount + c
-                cmd = fact(idx,str(r)+":"+str(c))
-                btn = tk.Button(rowpane, text="          ", relief=tk.RIDGE, command=cmd)
+                btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE)
                 btn.pack()
                 rowpane.add(btn)
                 self.buttons[idx] = btn
@@ -111,10 +112,10 @@ class Main(tk.Frame):
             while len(listener.unseen) > 0 and buttonIdx < maxIdx:
                 data = listener.unseen.pop(0)
                 log.info("listener check "+str(buttonIdx)+"; "+str(data))
-                self.updateButton(buttonIdx,data)
+                self.updateButton(buttonIdx,listener,data)
                 buttonIdx += 1
             while buttonIdx < maxIdx:
-                self.updateButton(buttonIdx,None)
+                self.updateButton(buttonIdx,listener,None)
                 buttonIdx += 1
             now = datetime.now()
             nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)

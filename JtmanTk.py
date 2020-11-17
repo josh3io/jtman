@@ -1,3 +1,4 @@
+from signal import signal, SIGINT
 import tkinter as tk
 import os, sys, time, threading
 from datetime import datetime
@@ -139,6 +140,7 @@ class Main(tk.Frame):
 
 
     def exit(self):
+        self.stopping = True
         if self.nextListen != None:
             self.nextListen.cancel()
         if self.listeners != []:
@@ -152,6 +154,7 @@ class JtmanTk(tk.Frame):
         self.parent = parent
 
         self.Main = Main(self.parent,q,config)
+        signal(SIGINT, self.Main.exit)
 
     def setListener(self,l):
         self.Main.setListener(l)

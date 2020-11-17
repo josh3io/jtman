@@ -14,6 +14,7 @@ class Main(tk.Frame):
         self.info = 'Jtman alert manager'
         self.config = config
         self.q = q
+        log.setLevel(config.get('OPTS','loglevel').upper())
 
         self.stopping = False
         self.nextListens = []
@@ -49,18 +50,19 @@ class Main(tk.Frame):
             self.buttons[idx].config(text="             ")
             self.buttons[idx].config(bg="grey")
         else:
-            log.info("update button "+str(idx)+" with call "+data['call'])
+            log.debug("update button "+str(idx)+" with call "+data['call'])
             text = data['call'].upper()
 
             if data['cq']:
-                text = '* '+text
-                self.buttons[idx].config(bg=self.cqcolor)
                 if data['newState']:
                     self.buttons[idx].config(bg=self.stcolor)
                     text = text + " - " + data['state']
                 elif data['newDx']:
                     self.buttons[idx].config(bg=self.dxcolor)
-                    text = text + " - " + data['country']
+                    text = text + "\n" + data['country']
+                else:
+                    self.buttons[idx].config(bg=self.cqcolor)
+                    text = "* "+text
                 cmd = lambda: listener.send_reply(data)
                 self.buttons[idx].config(command=cmd)
             else:
@@ -93,8 +95,10 @@ class Main(tk.Frame):
                 self.buttons[idx] = btn
 
     def initListeners(self):
+        print("LOG ",log)
         for lconfig in self.config.get('LISTENERS','addrs').splitlines():
-            log.debug("listener "+lconfig)
+            log.info('lconfig {}'.format(lconfig))
+            log.debug("listener {}".format(lconfig))
             addr = lconfig.split(':')
             l = Listener(self.q,self.config,addr[0],addr[1])
             l.listen()
@@ -111,7 +115,7 @@ class Main(tk.Frame):
             maxIdx = self.rowcount * self.columncount
             while len(listener.unseen) > 0 and buttonIdx < maxIdx:
                 data = listener.unseen.pop(0)
-                log.info("listener check "+str(buttonIdx)+"; "+str(data))
+                log.debug("listener check "+str(buttonIdx)+"; "+str(data))
                 self.updateButton(buttonIdx,listener,data)
                 buttonIdx += 1
             while buttonIdx < maxIdx:

@@ -24,10 +24,10 @@ class Logger(object):
             return getattr(self.logger, attr_name)
         log_level = getattr(logging, attr_name.upper())
          # mimicking logging/__init__.py behaviour
-        if not self.logger.isEnabledFor(log_level):
-            return
 
         def wrapped_attr(msg, *args, **kwargs):
+            if not self.logger.isEnabledFor(log_level):
+                return
             style_prefix = self.COLOR_MAP[attr_name]
             msg = style_prefix + msg + Style.RESET_ALL
             # We call _.log directly to not increase the callstack

@@ -17,9 +17,9 @@ class Listener:
         self.band = None
         self.lastReport = datetime.now()
         self.lastScan = None
-        self.logfiles = []
         self.q = q
         self.unseen = []
+        self.unlogged = []
         self.stopped = False
         self.ifttt_key = self.config.get('OPTS','ifttt_key')
         self.ip_address = ip_address
@@ -117,7 +117,7 @@ class Listener:
     def stop(self):
         log.debug("stopping wsjtx listener")
         self.stopped = True
-        self.t.join()
+        #self.t.join()
 
 
     def doListen(self):
@@ -152,11 +152,17 @@ class Listener:
         except Exception as e:
             pass
 
+    def update_log(self):
+        log.info("update log",self.the_packet)
+        self.unlogged.append()
+
     def handle_packet(self):
         if type(self.the_packet) == pywsjtx.HeartBeatPacket:
             self.heartbeat()
         elif type(self.the_packet) == pywsjtx.StatusPacket:
             self.update_status()
+        elif type(self.the_packet) == pywsjtx.QSOLoggedPacket:
+            self.update_log()
         elif self.band != None:
             if type(self.the_packet) == pywsjtx.DecodePacket:
                 self.parse_packet()

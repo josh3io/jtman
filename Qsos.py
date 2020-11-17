@@ -27,8 +27,8 @@ class Qsos:
         self.loadCountryData()
         self.loadCallStateData(callStateFile)
 
-    def loadLotw(self):
-        l = lotw_fetcher.Fetcher()
+    def loadLotw(self,username,password):
+        l = lotw_fetcher.Fetcher(username,password)
         adifData = l.getReport('1901-01-20')
         qsos, header = adif_io.read_from_string(str(adifData))
         self.load_qsos(qsos)

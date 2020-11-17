@@ -13,7 +13,7 @@ sys.path.append("./pywsjtx")
 
 from wsjtx_listener import Listener
 
-configFile = os.getenv('OPTS','config.ini')
+configFile = os.getenv('CONFIG')
 config = ConfigParser()
 config.read(configFile)
 
@@ -23,6 +23,7 @@ q.startScan()
 # set env GUI to zero, or env GUI is unset and GUI disabled in config
 print("GUI",os.getenv('GUI'),config.get('OPTS','gui'))
 if os.getenv('GUI') != 0 and not config.get('OPTS','gui'):
+    print("no gui")
     threads=[]
     listeners=[]
     for lconfig in self.config.get('LISTENERS','addrs').splitlines():
@@ -37,6 +38,7 @@ if os.getenv('GUI') != 0 and not config.get('OPTS','gui'):
     for t in threads:
         t.join()
 else:
+    print("gui enabled")
     mainWindow = tk.Tk()
     app = JtmanTk(mainWindow, q, config)
     mainWindow.mainloop()

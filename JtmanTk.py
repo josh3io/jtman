@@ -21,6 +21,11 @@ class Main(tk.Frame):
         self.listeners = []
 
         # config
+        log.info('config grid rows {} columns {}'
+            .format(
+                int(self.config.get('GUI_OPTS','rowcount')),
+                int(self.config.get('GUI_OPTS','columncount'))
+            ))
         self.rowcount = int(self.config.get('GUI_OPTS','rowcount'))
         self.columncount = int(self.config.get('GUI_OPTS','columncount'))
         self.cqcolor = self.config.get('GUI_OPTS','cqcolor')
@@ -88,6 +93,7 @@ class Main(tk.Frame):
             self.gridpane.add(rowpane)
             self.rows[r] = rowpane
             for c in range(self.columncount):
+                log.info('add row {} column {}'.format(r,c))
                 idx = r*self.columncount + c
                 btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE)
                 btn.pack()

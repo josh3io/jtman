@@ -37,7 +37,7 @@ class Listener:
                 username = self.config.get('LOTW','username')
                 password = self.config.get('LOTW','password')
                 if username and password:
-                    l.loadLotw()
+                    self.q.loadLotw(username,password)
 
 
     def ifttt_event(self,event):
@@ -77,17 +77,17 @@ class Listener:
             self.unseen.append(needData)
 
             if needData['newState'] == True:
-                log.info(colored("NEW STATE "+callsign+" "+needData['state'], 'magenta', 'on_white'))
+                log.info(colored("NEW STATE {} {}".format(callsign,needData['state']), 'magenta', 'on_white'))
                 bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
                 fg=pywsjtx.QCOLOR.Black()
                 self.ifttt_event('qso_was')
             elif needData['newDx'] == True:
-                log.info(colored("NEW DX "+callsign+" "+str(needData['dx'])+" "+needData['country'], 'red', 'on_white'))
+                log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
                 bg=pywsjtx.QCOLOR.Red()
                 fg=pywsjtx.QCOLOR.White()
                 self.ifttt_event('qso_dxcc')
             elif needData['newCall'] == True:
-                log.info(colored("NEW CALL "+callsign+" "+needData['state']+" "+needData['country'], 'white', 'on_blue'))
+                log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
                 bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
                 fg=pywsjtx.QCOLOR.White()
                 msg = msg + ' NEW CALL'

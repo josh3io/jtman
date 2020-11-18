@@ -154,7 +154,7 @@ class Listener:
 
     def update_log(self):
         log.info("update log",self.the_packet)
-        self.unlogged.append()
+        self.unlogged.append(self.the_packet.call)
 
     def handle_packet(self):
         if type(self.the_packet) == pywsjtx.HeartBeatPacket:
@@ -167,5 +167,5 @@ class Listener:
             if type(self.the_packet) == pywsjtx.DecodePacket:
                 self.parse_packet()
         else:
-            print('unknown packet type',type(self.the_packet),self.the_packet)
+            log.debug('unknown packet type {}; {}'.format(type(self.the_packet),self.the_packet))
 

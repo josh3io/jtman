@@ -35,6 +35,7 @@ class Main(tk.Frame):
 
         self.initUi()
         self.initListeners()
+        self.initButtonUpdate()
 
     def initUi(self):
         self.initMenu()
@@ -116,27 +117,31 @@ class Main(tk.Frame):
     def initListener(self,listener):
         self.listeners.append(listener)
         listenerIdx = len(self.listeners)
+        listener.listen()
+        log.debug("listener set "+str(listenerIdx))
+
+    def initButtonUpdate(self):
         def f():
-            time.sleep(2)
             buttonIdx = 0
             maxIdx = self.rowcount * self.columncount
-            while len(listener.unseen) > 0 and buttonIdx < maxIdx:
-                data = listener.unseen.pop(0)
-                log.debug("listener check "+str(buttonIdx)+"; "+str(data))
-                self.updateButton(buttonIdx,listener,data)
-                buttonIdx += 1
+            for listener in self.listeners:
+                log.info("Processing unseen count {} current buttonIdx {}, max {}".format(len(listener.unseen), buttonIdx, maxIdx))
+                while len(listener.unseen) > 0 and buttonIdx < maxIdx:
+                    data = listener.unseen.pop(0)
+                    log.debug("listener check {}; {}".format(buttonIdx,data))
+                    self.updateButton(buttonIdx,listener,data)
+                    buttonIdx += 1
             while buttonIdx < maxIdx:
                 self.updateButton(buttonIdx,listener,None)
                 buttonIdx += 1
             now = datetime.now()
             nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
             if self.stopping == False:
-                self.nextListen = threading.Timer((nextSleep-now).total_seconds()+15+12,f)
+                self.nextListen = threading.Timer((nextSleep-now).total_seconds()+15+13,f)
                 self.nextListen.start()
-                log.debug("next listener "+str(type(self.nextListen))+" "+str(self.nextListen))
+                log.debug("next listener {} {}".format(type(self.nextListen),self.nextListen))
         f()
-        listener.listen()
-        log.debug("listener set "+str(listenerIdx))
+
 
 
     def exit(self):

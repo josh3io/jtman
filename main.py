@@ -1,7 +1,11 @@
 import os
+from signal import signal, SIGINT
 import logging
 import time, threading
-from tkinter import *
+import tkinter as tk
+from configparser import ConfigParser
+from JtmanTk import JtmanTk
+import Qsos
 #logging.basicConfig(level=logging.DEBUG)
 
 import sys
@@ -10,36 +14,37 @@ sys.path.append("./pywsjtx")
 
 from wsjtx_listener import Listener
 
-ADIF_FILES = [
-        '/home/pi/Desktop/lotwreport.adi',
-        '/home/pi/.local/share/WSJT-X/wsjtx_log.adi'
-]
+configFile = os.getenv('CONFIG')
+config = ConfigParser()
+config.read(configFile)
 
-TEST_MULTICAST = False
+q = Qsos.Qsos()
+q.startScan()
 
-if TEST_MULTICAST:
-    IP_ADDRESS = '239.1.1.1'
-    PORT = 5007
+# set env GUI to zero, or env GUI is unset and GUI disabled in config
+print("GUI",os.getenv('GUI'),config.get('OPTS','gui',fallback=0))
+if os.getenv('GUI') == '0' or config.get('OPTS','gui') == 0 or config.get('OPTS','gui') == '0':
+    print("no gui")
+    threads=[]
+    listeners=[]
+    for lconfig in config.get('LISTENERS','addrs').splitlines():
+        addr = lconfig.split(':')
+        l = Listener(q,config,addr[0],addr[1])
+        t = threading.Thread(target = l.listen)
+        t.start()
+        threads.append(t)
+        listeners.append(l)
+    
+    def stopListeners():
+        for l in listeners:
+            l.stop()
+        for t in threads:
+            t.join()
+    signal(SIGINT, stopListeners)
 else:
-    IP_ADDRESS = '127.0.0.1'
-    PORT = 2237
-
-l = Listener(IP_ADDRESS,PORT)
-
-for filepath in ADIF_FILES:
-    l.addLogfile(filepath,True)
-if os.getenv('LOTW_USERNAME') and os.getenv('LOTW_PASSWORD'):
-    l.loadLotw()
-
-if os.getenv('GUI'):
-    finish = False
-    Process = threading.Thread(target=l.listen)
-    Process.start()
-
-    mainWindow = Tk()
-    app = Listener.gui(mainWindow)
+    print("gui enabled")
+    mainWindow = tk.Tk()
+    app = JtmanTk(mainWindow, q, config)
     mainWindow.mainloop()
-    finish = True
-    Process.join()
-else:
-    l.listen()
+
+q.stopScan()

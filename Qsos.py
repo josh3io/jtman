@@ -1,7 +1,10 @@
 import adif_io
 import csv
+import threading
+from datetime import datetime
 from pyhamtools import LookupLib, Callinfo
 import lotw_fetcher
+from logger import LOGGER as log
 
 
 def capitalize_keys(d):
@@ -14,18 +17,19 @@ def capitalize_keys(d):
 
 
 class Qsos:
-    def __init__(self,adifFile=None,callStateFile="./call_state.dat"):
+    def __init__(self,callStateFile="./call_state.dat"):
         self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
+
         for band in ['160','80','40','30','20','17','15','12','10','6','2']:
             self.qso['bands'][band+'M'] = {'dxcc':{},'states':{},'calls':{}}
 
+        self.adifFiles = []
+        self.scanThread = None
         self.loadCountryData()
         self.loadCallStateData(callStateFile)
-        if adifFile != None:
-            self.loadAdifFile(adifFile)
 
-    def loadLotw(self):
-        l = lotw_fetcher.Fetcher()
+    def loadLotw(self,username,password):
+        l = lotw_fetcher.Fetcher(username,password)
         adifData = l.getReport('1901-01-20')
         qsos, header = adif_io.read_from_string(str(adifData))
         self.load_qsos(qsos)
@@ -34,34 +38,57 @@ class Qsos:
          lookuplib = LookupLib(lookuptype="countryfile")
          self.cic = Callinfo(lookuplib)
 
+    def rescanAdifFiles(self):
+        for filepath in self.adifFiles:
+            self.loadAdifFile(filepath)
+
+    def addAdifFile(self,filepath,rescan=False):
+        self.loadAdifFile(filepath)
+        if rescan:
+            self.adifFiles.append(filepath)
+        self.lastScan = datetime.now()
+
     def loadAdifFile(self,filepath):
-        try:
-            adif = open(filepath, "r")
-            qsos, header = adif_io.read_from_string(adif.read())
-        except Exception as e:
-            print("something went wrong loading adif file",filepath,e)
-            raise e
-        adif.close()
-        self.load_qsos(qsos)
+        with open(filepath, "r") as adif:
+            try:
+                qsos, header = adif_io.read_from_string(adif.read())
+                self.load_qsos(qsos)
+            except Exception as e:
+                print("something went wrong loading adif file",filepath,e)
+                raise e
+
+    def startScan(self):
+        self.scanThread = threading.Timer(15, self.scanLogFiles)
+        self.scanThread.start()
+
+    def stopScan(self):
+        self.scanThread.cancel()
+
+    def scanLogFiles(self):
+        for filepath in self.adifFiles:
+            self.loadAdifFile(filepath)
+
 
     def load_qsos(self,qsos):
         for qso_raw in qsos:
-            qso = capitalize_keys(qso_raw)
+            self.addQso(qso_raw)
 
-            if 'STATE' in qso:
-                self.qso["states"][qso['STATE']] = True
-                self.qso["bands"][qso['BAND']]['states'][qso['STATE']] = True
+    def addQso(self,log_in):
+        qso = capitalize_keys(log_in)
 
-            self.qso["calls"][qso['CALL']] = True
-            self.qso["bands"][qso['BAND']]['calls'][qso['CALL']] = True
+        if 'STATE' in qso:
+            self.qso["states"][qso['STATE']] = True
+            self.qso["bands"][qso['BAND']]['states'][qso['STATE']] = True
 
-            if 'DXCC' not in qso:
-                call_info = self.cic.get_all(qso['CALL'])
-                qso['DXCC'] = call_info['adif']
+        self.qso["calls"][qso['CALL']] = True
+        self.qso["bands"][qso['BAND']]['calls'][qso['CALL']] = True
 
-            self.qso["dxcc"][int(qso['DXCC'])] = True
-            self.qso["bands"][qso['BAND']]['dxcc'][qso['DXCC']] = True
-        print("Add states ",self.qso['states'])
+        if 'DXCC' not in qso:
+            call_info = self.cic.get_all(qso['CALL'])
+            qso['DXCC'] = call_info['adif']
+
+        self.qso["dxcc"][int(qso['DXCC'])] = True
+        self.qso["bands"][qso['BAND']]['dxcc'][qso['DXCC']] = True
 
     def loadCallStateData(self,filepath):
         self.callstate={}
@@ -114,3 +141,5 @@ class Qsos:
         if callsign in self.callstate:
             return self.callstate[callsign]
         return ""
+
+

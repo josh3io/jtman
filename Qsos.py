@@ -1,6 +1,7 @@
 import adif_io
 import csv
-import threading
+import pickle
+import os,threading
 from datetime import datetime
 from pyhamtools import LookupLib, Callinfo
 import lotw_fetcher
@@ -17,12 +18,15 @@ def capitalize_keys(d):
 
 
 class Qsos:
-    def __init__(self,callStateFile="./call_state.dat"):
+    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.adif',callStateFile="./call_state.dat"):
         self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
 
         for band in ['160','80','40','30','20','17','15','12','10','6','2']:
             self.qso['bands'][band+'M'] = {'dxcc':{},'states':{},'calls':{}}
 
+        self.lotwFile = lotwFile
+        self.reloadAge = reloadAge
+        self.oldestLog = oldestLog
         self.adifFiles = []
         self.scanThread = None
         self.loadCountryData()
@@ -30,13 +34,38 @@ class Qsos:
 
     def loadLotw(self,username,password):
         l = lotw_fetcher.Fetcher(username,password)
-        adifData = l.getReport('1901-01-20')
-        qsos, header = adif_io.read_from_string(str(adifData))
+        qsos = []
+        mtime = 0
+
+        try:
+            statbuf = os.stat(self.lotwFile)
+            log.debug("Modification time: {}".format(statbuf.st_mtime))
+            mtime = statbuf.st_mtime
+            log.debug("Loading pickle; mtime {}".format(mtime))
+            with open(self.lotwFile,'rb') as f:
+                qsos = pickle.load(f)
+        except FileNotFoundError:
+            open(self.lotwFile,'wb').close()
+        except Exception as e:
+            log.debug("pickle exception {}".format(e))
+            pass
+
+        now = datetime.now().timestamp()
+        
+        
+        log.debug("len {} age {} reloadAge {}".format(len(qsos),now-mtime,self.reloadAge))
+        if now - mtime > self.reloadAge or len(qsos) == 0:
+            adifData = l.getReport(self.oldestLog)
+            qsos, header = adif_io.read_from_string(str(adifData))
+            with open(self.lotwFile,'wb') as f_out:
+                pickle.dump(qsos,f_out)
         self.load_qsos(qsos)
 
     def loadCountryData(self):
-         lookuplib = LookupLib(lookuptype="countryfile")
-         self.cic = Callinfo(lookuplib)
+        log.info("loading country data")
+        lookuplib = LookupLib(lookuptype="countryfile")
+        self.cic = Callinfo(lookuplib)
+        log.info("country data loaded")
 
     def rescanAdifFiles(self):
         for filepath in self.adifFiles:
@@ -49,6 +78,7 @@ class Qsos:
         self.lastScan = datetime.now()
 
     def loadAdifFile(self,filepath):
+        log.info("loading logfile {}".format(filepath))
         with open(filepath, "r") as adif:
             try:
                 qsos, header = adif_io.read_from_string(adif.read())
@@ -56,6 +86,7 @@ class Qsos:
             except Exception as e:
                 print("something went wrong loading adif file",filepath,e)
                 raise e
+        log.info("logfile loaded {}".format(filepath))
 
     def startScan(self):
         self.scanThread = threading.Timer(15, self.scanLogFiles)

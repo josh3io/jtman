@@ -1,12 +1,11 @@
 import os
 from signal import signal, SIGINT
-import logging
 import time, threading
 import tkinter as tk
 from configparser import ConfigParser
 from JtmanTk import JtmanTk
 import Qsos
-#logging.basicConfig(level=logging.DEBUG)
+from logger import LOGGER as log
 
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -18,13 +17,13 @@ configFile = os.getenv('CONFIG')
 config = ConfigParser()
 config.read(configFile)
 
-q = Qsos.Qsos()
+q = Qsos.Qsos(lotwFile=config.get('LOTW','cache_filename'))
 q.startScan()
 
 # set env GUI to zero, or env GUI is unset and GUI disabled in config
-print("GUI",os.getenv('GUI'),config.get('OPTS','gui',fallback=0))
+log.debug("GUI {}; {}".format(os.getenv('GUI'),config.get('OPTS','gui',fallback=0)))
 if os.getenv('GUI') == '0' or config.get('OPTS','gui') == 0 or config.get('OPTS','gui') == '0':
-    print("no gui")
+    log.debug("no gui")
     threads=[]
     listeners=[]
     for lconfig in config.get('LISTENERS','addrs').splitlines():
@@ -42,7 +41,7 @@ if os.getenv('GUI') == '0' or config.get('OPTS','gui') == 0 or config.get('OPTS'
             t.join()
     signal(SIGINT, stopListeners)
 else:
-    print("gui enabled")
+    log.debug("gui enabled")
     mainWindow = tk.Tk()
     app = JtmanTk(mainWindow, q, config)
     mainWindow.mainloop()

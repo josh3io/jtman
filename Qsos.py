@@ -18,7 +18,7 @@ def capitalize_keys(d):
 
 
 class Qsos:
-    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.adif',callStateFile="./call_state.dat"):
+    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.dat',callStateFile="./call_state.dat"):
         self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
 
         for band in ['160','80','40','30','20','17','15','12','10','6','2']:

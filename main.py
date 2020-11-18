@@ -13,7 +13,7 @@ sys.path.append("./pywsjtx")
 
 from wsjtx_listener import Listener
 
-configFile = os.getenv('CONFIG')
+configFile = os.getenv('CONFIG') or 'config.ini'
 config = ConfigParser()
 config.read(configFile)
 
@@ -33,7 +33,7 @@ if os.getenv('GUI') == '0' or config.get('OPTS','gui') == 0 or config.get('OPTS'
         t.start()
         threads.append(t)
         listeners.append(l)
-    
+
     def stopListeners():
         for l in listeners:
             l.stop()

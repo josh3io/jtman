@@ -22,13 +22,14 @@ class Main(tk.Frame):
         self.listeners = []
 
         # config
-        log.info('config grid rows {} columns {}'
+        log.debug('config grid rows {} columns {}'
             .format(
                 int(self.config.get('GUI_OPTS','rowcount')),
                 int(self.config.get('GUI_OPTS','columncount'))
             ))
         self.rowcount = int(self.config.get('GUI_OPTS','rowcount'))
         self.columncount = int(self.config.get('GUI_OPTS','columncount'))
+        self.maxIdx = self.rowcount * self.columncount
         self.cqcolor = self.config.get('GUI_OPTS','cqcolor')
         self.dxcolor = self.config.get('GUI_OPTS','dxcolor')
         self.stcolor = self.config.get('GUI_OPTS','stcolor')
@@ -95,7 +96,7 @@ class Main(tk.Frame):
             self.gridpane.add(rowpane)
             self.rows[r] = rowpane
             for c in range(self.columncount):
-                log.info('add row {} column {}'.format(r,c))
+                log.debug('add row {} column {}'.format(r,c))
                 idx = r*self.columncount + c
                 btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE)
                 btn.pack()
@@ -103,48 +104,53 @@ class Main(tk.Frame):
                 self.buttons[idx] = btn
 
     def initListeners(self):
-        print("LOG ",log)
-        for lconfig in self.config.get('LISTENERS','addrs').splitlines():
-            log.info('lconfig {}'.format(lconfig))
-            log.debug("listener {}".format(lconfig))
-            addr = lconfig.split(':')
-            l = Listener(self.q,self.config,addr[0],addr[1])
-            l.listen()
-            log.debug("listening")
-            self.initListener(l)
+        for listenerAddr in self.config.get('LISTENERS','addrs').splitlines():
+            log.debug("starting listener {}".format(listenerAddr))
+            self.initListener(listenerAddr)
 
 
-    def initListener(self,listener):
+    def initListener(self,listenerAddr):
+        addr = listenerAddr.split(':')
+        listener = Listener(self.q,self.config,addr[0],addr[1])
+        listener.listen()
+        log.info("listening to {}".format(listenerAddr))
         self.listeners.append(listener)
         listenerIdx = len(self.listeners)
-        listener.listen()
         log.debug("listener set "+str(listenerIdx))
+
+    def updateFromListener(self,listener,buttonIdx):
+        log.debug("Processing unseen count {} current buttonIdx {}, max {}".format(len(listener.unseen), buttonIdx, self.maxIdx))
+        while len(listener.unseen) > 0 and buttonIdx < self.maxIdx:
+            data = listener.unseen.pop(0)
+            log.debug("listener check {}; {}".format(buttonIdx,data))
+            self.updateButton(buttonIdx,listener,data)
+            buttonIdx += 1
+        return buttonIdx
 
     def initButtonUpdate(self):
         def f():
+            for idx in range(self.maxIdx):
+                self.updateButton(idx,None,None)
             buttonIdx = 0
-            maxIdx = self.rowcount * self.columncount
-            for listener in self.listeners:
-                log.info("Processing unseen count {} current buttonIdx {}, max {}".format(len(listener.unseen), buttonIdx, maxIdx))
-                while len(listener.unseen) > 0 and buttonIdx < maxIdx:
-                    data = listener.unseen.pop(0)
-                    log.debug("listener check {}; {}".format(buttonIdx,data))
-                    self.updateButton(buttonIdx,listener,data)
-                    buttonIdx += 1
-            while buttonIdx < maxIdx:
-                self.updateButton(buttonIdx,listener,None)
-                buttonIdx += 1
+            for seconds in range(8):
+                for listener in self.listeners:
+                    buttonIdx = self.updateFromListener(listener,buttonIdx)
+                time.sleep(0.5)
+
+            log.debug("Populated {}/{}".format(buttonIdx,self.maxIdx))
+
+
             now = datetime.now()
             nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
             if self.stopping == False:
-                self.nextListen = threading.Timer((nextSleep-now).total_seconds()+15+13,f)
+                self.nextListen = threading.Timer((nextSleep-now).total_seconds()+12,f)
                 self.nextListen.start()
                 log.debug("next listener {} {}".format(type(self.nextListen),self.nextListen))
         f()
 
 
 
-    def exit(self):
+    def exit(self,signum,frame):
         self.stopping = True
         if self.nextListen != None:
             self.nextListen.cancel()

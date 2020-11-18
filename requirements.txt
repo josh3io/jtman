@@ -1,6 +1,21 @@
 ####### pip3 install -r requirements.txt
 
-pandas
-colorama
 adif_io
-
+colorama
+configparser
+csv
+datetime
+logging
+os
+pandas
+pickle
+pyhamtools
+random
+re
+requests
+signal
+sys
+termcolor
+threading
+time
+tkinter

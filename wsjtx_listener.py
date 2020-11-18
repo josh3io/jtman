@@ -153,7 +153,7 @@ class Listener:
             pass
 
     def update_log(self):
-        log.info("update log",self.the_packet)
+        log.info("update log".format(self.the_packet))
         self.unlogged.append(self.the_packet.call)
 
     def handle_packet(self):

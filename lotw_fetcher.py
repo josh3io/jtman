@@ -1,6 +1,7 @@
 import os
 import requests
 from http.cookiejar import CookieJar
+from logger import LOGGER as log
 
 
 class Fetcher:
@@ -10,10 +11,12 @@ class Fetcher:
         self.cookies = {}
 
     def login(self):
+        log.info("logging into lotw")
         login_data = {'login' : self.username, 'password' : self.password, 'thisForm': 'login'}
         resp = requests.post('https://lotw.arrl.org/lotwuser/lotwreport.adi', data=login_data, cookies=self.cookies)
-        print(resp.content)
+        log.debug("lotw login {}".format(resp.content))
         self.cookies = resp.cookies
+        log.info("logged into lotw")
 
 
     def getReport(self,since='1901-01-01',call=''):
@@ -27,7 +30,9 @@ class Fetcher:
             'qso_mydetail': 'yes',
             'qso_owncall': call 
             }
+        log.info("lotw request log")
         resp = requests.get('https://lotw.arrl.org/lotwuser/lotwreport.adi', params=report_data, cookies=self.cookies)
+        log.info("lotw log request complete")
         content = resp.content
         if content.startswith(b'ARRL Logbook of the World Status Report'):
             return resp.content

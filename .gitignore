@@ -137,8 +137,12 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# VSCode
+.vscode/
+
 # Script specific
 calls/
 call_state.dat
 callstate.dictionary
 last-callsign-update
+my_config.ini

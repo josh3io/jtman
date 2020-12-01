@@ -18,7 +18,7 @@ def capitalize_keys(d):
 
 
 class Qsos:
-    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.dat',callStateFile="./call_state.dat"):
+    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.dat',callStateFile="./call_state.dat",countryCodeCsv="./country_codes.csv"):
         self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
 
         for band in ['160','80','40','30','20','17','15','12','10','6','2']:
@@ -28,12 +28,21 @@ class Qsos:
         self.reloadAge = reloadAge
         self.oldestLog = oldestLog
         self.adifFiles = []
+        self.countryCodes = {'byCode':{}, 'byName':{}}
         self.scanThread = None
+        self.loadCountryCodes(countryCodeCsv)
         self.loadCountryData()
         self.loadCallStateData(callStateFile)
 
-    def loadLotw(self,username,password):
-        l = lotw_fetcher.Fetcher(username,password)
+    def loadCountryCodes(self,filename):
+        with open(filename) as fin:
+            reader=csv.reader(fin, skipinitialspace=True, delimiter=',', quotechar='"')
+            for row in reader:
+                self.countryCodes['byCode'][row[1]] = row[0]
+                self.countryCodes['byName'][row[0]] = row[1]
+        
+    def loadLotw(self,_username,_password):
+        l = lotw_fetcher.Fetcher(username=_username,password=_password)
         qsos = []
         mtime = 0
 
@@ -129,12 +138,13 @@ class Qsos:
                 self.callstate[row[0]]=row[1]
 
     def needDataByBandAndCall(self,band,callsign):
-        (dx, country) = self.dx(band,callsign)
+        (dx, country, code) = self.dx(band,callsign)
         state = self.state(band,callsign)
 
         return {
             'dx': dx,
             'country': country,
+            'code': code,
             'state': state,
             'newDx': self.needDx(band,dx),
             'newState': self.needState(band,state),
@@ -160,13 +170,16 @@ class Qsos:
             )
         )
 
+    def codeByName(self,name):
+        return self.countryCodes['byName'][name] or ""
+
     def dx(self,band,callsign):
         try:
             call_info = self.cic.get_all(callsign)
-            return (call_info['adif'],call_info['country'])
+            return (call_info['adif'],call_info['country'],self.codeByName(call_info['country']))
         except KeyError:
             print("Could not lookup callsign dx: '",callsign,"'")
-            return (False,False)
+            return (False,False,False)
 
     def state(self,band,callsign):
         if callsign in self.callstate:

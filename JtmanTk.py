@@ -8,11 +8,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.append("./pywsjtx")
 from wsjtx_listener import Listener
 
+default_info = 'Jtman alert manager'
+
 class Main(tk.Frame):
     def __init__(self, parent, q, config):
         tk.Frame.__init__(self, parent)
         self.parent = parent
-        self.info = 'Jtman alert manager'
+        self.info = tk.StringVar()
         self.config = config
         self.q = q
         log.setLevel(config.get('OPTS','loglevel').upper())
@@ -61,16 +63,24 @@ class Main(tk.Frame):
             log.debug("update button "+str(idx)+" with call "+data['call'])
             text = data['call'].upper()
 
+            if data['newState']:
+                text = text + " - " + data['state']
+            elif data['newDx']:
+                text = text + "; " + data['code']
+
+            if data['cq']:
+                if data['directed']:
+                    text = "*{}: {}".format(data['directed'],text)
+                else:
+                    text = "* "+text
+
             if data['cq']:
                 if data['newState']:
                     self.buttons[idx].config(bg=self.stcolor)
-                    text = text + " - " + data['state']
                 elif data['newDx']:
                     self.buttons[idx].config(bg=self.dxcolor)
-                    text = text + "\n" + data['country']
                 else:
                     self.buttons[idx].config(bg=self.cqcolor)
-                    text = "* "+text
                 cmd = lambda: listener.send_reply(data)
                 self.buttons[idx].config(command=cmd)
             else:
@@ -78,12 +88,29 @@ class Main(tk.Frame):
             self.buttons[idx].config(text=text)
                 
             
+    def updateStatusMessage(self,bands=None,call=None):
+        log.debug('updateStatusMessage call {}; bands {}'.format(call,bands))
+        info_str = ''
+        if call != None:
+            self.call = call
+            info_str = 'Operating as '+call
+        if bands != None and len(bands) > 0:
+            if len(bands) == 1:
+                s=''
+            else:
+                s='s'
+            if call != None:
+                info_str = info_str + ' | '
+            info_str = info_str + 'band{} {}'.format(s,','.join(bands))
+        self.info.set(' | '.join([default_info,info_str]))
+
 
     def initGrid(self):
         self.gridpane = tk.PanedWindow(orient=tk.VERTICAL)
         self.gridpane.pack(fill=tk.BOTH, expand=1)
 
-        self.textInfo = tk.Label(self.gridpane, text=self.info, relief=tk.RAISED)
+        self.info.set(default_info)
+        self.textInfo = tk.Label(self.gridpane, textvariable=self.info, relief=tk.RAISED)
 
         self.gridpane.add(self.textInfo)
 
@@ -98,7 +125,7 @@ class Main(tk.Frame):
             for c in range(self.columncount):
                 log.debug('add row {} column {}'.format(r,c))
                 idx = r*self.columncount + c
-                btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE)
+                btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE, width=10,height=1)
                 btn.pack()
                 rowpane.add(btn)
                 self.buttons[idx] = btn
@@ -129,20 +156,50 @@ class Main(tk.Frame):
 
     def initButtonUpdate(self):
         def f():
-            for idx in range(self.maxIdx):
-                self.updateButton(idx,None,None)
-            buttonIdx = 0
-            for seconds in range(8):
+            if len(self.listeners) > 0:
+                # clear buttons
+                for idx in range(self.maxIdx):
+                    self.updateButton(idx,None,None)
+
+                # get the latest call and band info
+                # and update the status message bar
+                listener_bands = []
                 for listener in self.listeners:
-                    buttonIdx = self.updateFromListener(listener,buttonIdx)
-                time.sleep(0.5)
+                    if listener.band != None:
+                        listener_bands.append(listener.band)
+                self.updateStatusMessage(call=self.listeners[0].call,bands=listener_bands)
 
-            log.debug("Populated {}/{}".format(buttonIdx,self.maxIdx))
+                # try for 5 seconds to collect decodes 
+                # from all attached listeners
+                # try twice a second
+                # it's cheap
+                # ¿por qué no?
+                buttonIdx = 0
+                for seconds in range(10):
+                    for listener in self.listeners:
+                        # get the list of calls and increment the button
+                        buttonIdx = self.updateFromListener(listener,buttonIdx)
+                        if buttonIdx > self.maxIdx:
+                            break
+                    if buttonIdx > self.maxIdx:
+                        break
+                    time.sleep(0.5)
 
+
+                # make sure we start fresh next time
+                # if we surpassed the max number of
+                # displayable calls we don't want to
+                # show stale info
+                for listener in self.listeners:
+                    listener.unseen = []
+
+                log.debug("Populated {}/{}".format(buttonIdx,self.maxIdx))
 
             now = datetime.now()
             nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
             if self.stopping == False:
+                # sleep until the next 1/4 minute + 12sec
+                # that is the start of the next decode cycle
                 self.nextListen = threading.Timer((nextSleep-now).total_seconds()+12,f)
                 self.nextListen.start()
                 log.debug("next listener {} {}".format(type(self.nextListen),self.nextListen))
@@ -150,12 +207,14 @@ class Main(tk.Frame):
 
 
 
-    def exit(self,signum,frame):
+    def exit(self,signum=None,frame=None):
         self.stopping = True
         if self.nextListen != None:
             self.nextListen.cancel()
-        if self.listeners != []:
+        if len(self.listeners) > 0:
             for listener in self.listeners:
+                log.info('STOP LISTENER {}'.format(listener))
+                log.info("stop listener {}:{}".format(listener.ip_address,listener.port))
                 listener.stop()
         self.parent.destroy()
 

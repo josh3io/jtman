@@ -14,12 +14,12 @@ class Listener:
     def __init__(self,q,config,ip_address,port,timeout=2.0):
         log.debug('new listener: '+str(q))
         self.config = config
+        self.call = None
         self.band = None
         self.lastReport = datetime.now()
         self.lastScan = None
         self.q = q
         self.unseen = []
-        self.unlogged = []
         self.stopped = False
         self.ifttt_key = self.config.get('OPTS','ifttt_key')
         self.ip_address = ip_address
@@ -61,6 +61,7 @@ class Listener:
         m = re.match(r"^CQ\s(\w{2}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
         if m:
             #print("Callsign {}".format(m.group(1)))
+            directed = m.group(1)
             callsign = m.group(2)
             grid = m.group(4)
             #print("CALL ",callsign,' on ',self.band)
@@ -69,6 +70,7 @@ class Listener:
 
             msg = callsign
             needData = self.q.needDataByBandAndCall(self.band,callsign)
+            needData['directed'] = directed
             needData['call'] = callsign
             needData['grid'] = grid
             needData['cq'] = True
@@ -103,14 +105,14 @@ class Listener:
             if m:
                 call1 = m.group(1)
                 call2 = m.group(2)
-                needData = self.q.needDataByBandAndCall(self.band,call1)
-                needData['call'] = call1
-                needData['cq'] = False
-                self.unseen.append(needData)
-                needData = self.q.needDataByBandAndCall(self.band,call2)
-                needData['call'] = call2
-                needData['cq'] = False
-                self.unseen.append(needData)
+                needData1 = self.q.needDataByBandAndCall(self.band,call1)
+                needData1['call'] = call1
+                needData1['cq'] = False
+                needData2 = self.q.needDataByBandAndCall(self.band,call2)
+                needData2['call'] = call2
+                needData2['cq'] = False
+                if needData1['call'] and needData2['call']:
+                    self.unseen.append(needData2)
 
         pass
 
@@ -145,16 +147,21 @@ class Listener:
         self.s.send_packet(self.addr_port, reply_beat_packet)
 
     def update_status(self):
-        #print('status ',self.the_packet)
+        log.debug('wsjt-x status {}'.format(self.the_packet))
         try:
             bandinfo = freq_to_band(self.the_packet.dial_frequency/1000)
+            self.call = self.the_packet.de_call
             self.band = str(bandinfo['band'])+'M'
         except Exception as e:
             pass
 
     def update_log(self):
         log.info("update log".format(self.the_packet))
-        self.unlogged.append(self.the_packet.call)
+        nd = self.q.needDataByBandAndCall(self.band,self.the_packet.call)
+        qso = { 'CALL': nd['call'], 'DXCC': nd['dx'], 'BAND': nd['band'] }
+        if state in nd:
+            qso['STATE'] = nd['state']
+        self.q.addQso(qso)
 
     def handle_packet(self):
         if type(self.the_packet) == pywsjtx.HeartBeatPacket:

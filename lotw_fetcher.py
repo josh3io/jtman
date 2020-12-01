@@ -11,7 +11,7 @@ class Fetcher:
         self.cookies = {}
 
     def login(self):
-        log.info("logging into lotw")
+        log.info("logging into lotw {}, {}".format(self.username,self.password))
         login_data = {'login' : self.username, 'password' : self.password, 'thisForm': 'login'}
         resp = requests.post('https://lotw.arrl.org/lotwuser/lotwreport.adi', data=login_data, cookies=self.cookies)
         log.debug("lotw login {}".format(resp.content))

@@ -158,7 +158,7 @@ class Listener:
     def update_log(self):
         log.info("update log".format(self.the_packet))
         nd = self.q.needDataByBandAndCall(self.band,self.the_packet.call)
-        qso = { 'CALL': nd['call'], 'DXCC': nd['dx'], 'BAND': nd['band'] }
+        qso = { 'CALL': self.the_packet.call, 'DXCC': nd['dx'], 'BAND': nd['band'] }
         if state in nd:
             qso['STATE'] = nd['state']
         self.q.addQso(qso)

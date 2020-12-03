@@ -3,6 +3,7 @@ import tkinter as tk
 import os, sys, time, threading
 from datetime import datetime
 from logger import LOGGER as log
+import Qsos
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append("./pywsjtx")
@@ -11,13 +12,16 @@ from wsjtx_listener import Listener
 default_info = 'Jtman alert manager'
 
 class Main(tk.Frame):
-    def __init__(self, parent, q, config):
+    def __init__(self, parent, config):
         tk.Frame.__init__(self, parent)
         self.parent = parent
+
         self.info = tk.StringVar()
         self.config = config
-        self.q = q
         log.setLevel(config.get('OPTS','loglevel').upper())
+
+        self.q = Qsos.Qsos(lotwFile=config.get('LOTW','cache_filename'))
+        self.q.startScan()
 
         self.stopping = False
         self.nextListens = []
@@ -63,9 +67,9 @@ class Main(tk.Frame):
             log.debug("update button "+str(idx)+" with call "+data['call'])
             text = data['call'].upper()
 
-            if data['newState']:
+            if data['newState'] and data['state']:
                 text = text + " - " + data['state']
-            elif data['newDx']:
+            elif data['newDx'] and data['code']:
                 text = text + "; " + data['code']
 
             if data['cq']:
@@ -208,22 +212,26 @@ class Main(tk.Frame):
 
 
     def exit(self,signum=None,frame=None):
-        self.stopping = True
-        if self.nextListen != None:
-            self.nextListen.cancel()
-        if len(self.listeners) > 0:
-            for listener in self.listeners:
-                log.info('STOP LISTENER {}'.format(listener))
-                log.info("stop listener {}:{}".format(listener.ip_address,listener.port))
-                listener.stop()
-        self.parent.destroy()
+        try:
+            self.q.stopScan()
+            self.stopping = True
+            if self.nextListen != None:
+                self.nextListen.cancel()
+            if len(self.listeners) > 0:
+                for listener in self.listeners:
+                    log.debug('STOP LISTENER {}'.format(listener))
+                    log.info("stop listener {}:{}".format(listener.ip_address,listener.port))
+                    listener.stop()
+            self.parent.destroy()
+        except Exception as e:
+            log.info("exit caught {}".format(e))
 
 class JtmanTk(tk.Frame):
-    def __init__(self, parent, q, config, *args, **kwargs):
+    def __init__(self, parent, config, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
-        self.Main = Main(self.parent,q,config)
+        self.Main = Main(self.parent, config)
         signal(SIGINT, self.Main.exit)
 
     def setListener(self,l):

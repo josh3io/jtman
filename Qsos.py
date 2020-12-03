@@ -28,6 +28,7 @@ class Qsos:
         self.reloadAge = reloadAge
         self.oldestLog = oldestLog
         self.adifFiles = []
+        self.adifFilesLastChange = {}
         self.countryCodes = {'byCode':{}, 'byName':{}}
         self.scanThread = None
         self.loadCountryCodes(countryCodeCsv)
@@ -71,7 +72,7 @@ class Qsos:
         self.load_qsos(qsos)
 
     def loadCountryData(self):
-        log.info("loading country data")
+        log.info("loading country data (this is slow)")
         lookuplib = LookupLib(lookuptype="countryfile")
         self.cic = Callinfo(lookuplib)
         log.info("country data loaded")
@@ -87,26 +88,30 @@ class Qsos:
         self.lastScan = datetime.now()
 
     def loadAdifFile(self,filepath):
-        log.info("loading logfile {}".format(filepath))
+        log.debug("loading logfile {}".format(filepath))
         with open(filepath, "r") as adif:
             try:
                 qsos, header = adif_io.read_from_string(adif.read())
                 self.load_qsos(qsos)
             except Exception as e:
-                print("something went wrong loading adif file",filepath,e)
+                log.error("Error loading adif file {}: {}".format(filepath,e))
                 raise e
-        log.info("logfile loaded {}".format(filepath))
+        log.debug("logfile loaded {}".format(filepath))
 
     def startScan(self):
-        self.scanThread = threading.Timer(15, self.scanLogFiles)
+        self.scanThread = threading.Timer(10, self.scanLogFiles)
         self.scanThread.start()
 
     def stopScan(self):
         self.scanThread.cancel()
 
     def scanLogFiles(self):
+        log.debug("scanning logfiles")
         for filepath in self.adifFiles:
-            self.loadAdifFile(filepath)
+            m = os.stat(filepath).st_mtime
+            if filepath not in self.adifFilesLastChange or m > self.adifFilesLastChange[filepath]:
+                self.adifFilesLastChange[filepath] = m
+                self.loadAdifFile(filepath)
 
 
     def load_qsos(self,qsos):
@@ -138,6 +143,7 @@ class Qsos:
                 self.callstate[row[0]]=row[1]
 
     def needDataByBandAndCall(self,band,callsign):
+        callsign = callsign.strip()
         (dx, country, code) = self.dx(band,callsign)
         state = self.state(band,callsign)
 
@@ -171,14 +177,19 @@ class Qsos:
         )
 
     def codeByName(self,name):
-        return self.countryCodes['byName'][name] or ""
+        if name in self.countryCodes['byName']:
+            return self.countryCodes['byName'][name]
+        else:
+            return 
 
     def dx(self,band,callsign):
+        call_info = {}
         try:
             call_info = self.cic.get_all(callsign)
+            log.debug("call info {}".format(call_info))
             return (call_info['adif'],call_info['country'],self.codeByName(call_info['country']))
-        except KeyError:
-            print("Could not lookup callsign dx: '",callsign,"'")
+        except Exception as e:
+            log.error("Could not lookup callsign dx: '{}'; {}".format(callsign,e))
             return (False,False,False)
 
     def state(self,band,callsign):

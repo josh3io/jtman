@@ -57,64 +57,67 @@ class Listener:
 
     def parse_packet(self):
         #print('decode packet ',self.the_packet)
+        try:
 
-        m = re.match(r"^CQ\s(\w{2}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
-        if m:
-            #print("Callsign {}".format(m.group(1)))
-            directed = m.group(1)
-            callsign = m.group(2)
-            grid = m.group(4)
-            #print("CALL ",callsign,' on ',self.band)
-
-            self.print_line()
-
-            msg = callsign
-            needData = self.q.needDataByBandAndCall(self.band,callsign)
-            needData['directed'] = directed
-            needData['call'] = callsign
-            needData['grid'] = grid
-            needData['cq'] = True
-            needData['packet'] = self.the_packet
-            needData['addr_port'] = self.addr_port
-            self.unseen.append(needData)
-
-            if needData['newState'] == True:
-                log.info(colored("NEW STATE {} {}".format(callsign,needData['state']), 'magenta', 'on_white'))
-                bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
-                fg=pywsjtx.QCOLOR.Black()
-                self.ifttt_event('qso_was')
-            elif needData['newDx'] == True:
-                log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
-                bg=pywsjtx.QCOLOR.Red()
-                fg=pywsjtx.QCOLOR.White()
-                self.ifttt_event('qso_dxcc')
-            elif needData['newCall'] == True:
-                log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
-                bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
-                fg=pywsjtx.QCOLOR.White()
-                msg = msg + ' NEW CALL'
-            else:
-                bg=pywsjtx.QCOLOR.Uncolor()
-                fg=pywsjtx.QCOLOR.Uncolor()
-                msg = msg + '_'
-
-            color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
-            self.s.send_packet(self.addr_port, color_pkt)
-        else:
-            m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+)", self.the_packet.message)
+            m = re.match(r"^CQ\s(\w{2}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
             if m:
-                call1 = m.group(1)
-                call2 = m.group(2)
-                needData1 = self.q.needDataByBandAndCall(self.band,call1)
-                needData1['call'] = call1
-                needData1['cq'] = False
-                needData2 = self.q.needDataByBandAndCall(self.band,call2)
-                needData2['call'] = call2
-                needData2['cq'] = False
-                if needData1['call'] and needData2['call']:
-                    self.unseen.append(needData2)
+                #print("Callsign {}".format(m.group(1)))
+                directed = m.group(1)
+                callsign = m.group(2)
+                grid = m.group(4)
+                #print("CALL ",callsign,' on ',self.band)
 
-        pass
+                self.print_line()
+
+                msg = callsign
+                needData = self.q.needDataByBandAndCall(self.band,callsign)
+                needData['directed'] = directed
+                needData['call'] = callsign
+                needData['grid'] = grid
+                needData['cq'] = True
+                needData['packet'] = self.the_packet
+                needData['addr_port'] = self.addr_port
+                self.unseen.append(needData)
+
+                if needData['newState'] == True:
+                    log.info(colored("NEW STATE {} {}".format(callsign,needData['state']), 'magenta', 'on_white'))
+                    bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
+                    fg=pywsjtx.QCOLOR.Black()
+                    self.ifttt_event('qso_was')
+                elif needData['newDx'] == True:
+                    log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
+                    bg=pywsjtx.QCOLOR.Red()
+                    fg=pywsjtx.QCOLOR.White()
+                    self.ifttt_event('qso_dxcc')
+                elif needData['newCall'] == True:
+                    log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
+                    bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
+                    fg=pywsjtx.QCOLOR.White()
+                    msg = msg + ' NEW CALL'
+                else:
+                    bg=pywsjtx.QCOLOR.Uncolor()
+                    fg=pywsjtx.QCOLOR.Uncolor()
+                    msg = msg + '_'
+
+                color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
+                self.s.send_packet(self.addr_port, color_pkt)
+            else:
+                m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+)", self.the_packet.message)
+                if m:
+                    call1 = m.group(1)
+                    call2 = m.group(2)
+                    needData1 = self.q.needDataByBandAndCall(self.band,call1)
+                    needData1['call'] = call1
+                    needData1['cq'] = False
+                    needData2 = self.q.needDataByBandAndCall(self.band,call2)
+                    needData2['call'] = call2
+                    needData2['cq'] = False
+                    if needData1['call'] and needData2['call']:
+                        self.unseen.append(needData2)
+
+            pass
+        except TypeError:
+            log.error("Caught a type error in parsing packet: {}".format(self.the_packet.message))
 
     def stop(self):
         log.debug("stopping wsjtx listener")

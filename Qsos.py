@@ -12,7 +12,10 @@ def capitalize_keys(d):
     result = {}
     for key, value in d.items():
         upper_key = key.upper()
-        result[upper_key] = value.upper()
+        if type(value) == str:
+            result[upper_key] = str(value).upper()
+        else:
+            result[upper_key] = value
     return result
 
 

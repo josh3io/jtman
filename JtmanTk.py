@@ -36,6 +36,7 @@ class Main(tk.Frame):
         self.rowcount = int(self.config.get('GUI_OPTS','rowcount'))
         self.columncount = int(self.config.get('GUI_OPTS','columncount'))
         self.maxIdx = self.rowcount * self.columncount
+        self.clcolor = self.config.get('GUI_OPTS','clcolor')
         self.cqcolor = self.config.get('GUI_OPTS','cqcolor')
         self.dxcolor = self.config.get('GUI_OPTS','dxcolor')
         self.stcolor = self.config.get('GUI_OPTS','stcolor')
@@ -60,9 +61,12 @@ class Main(tk.Frame):
 
 
     def updateButton(self,idx,listener,data):
+        def noop():
+            pass
         if data == None:
             self.buttons[idx].config(text="             ")
             self.buttons[idx].config(bg="grey")
+            self.buttons[idx].config(command=noop)
         else:
             log.debug("update button "+str(idx)+" with call "+data['call'])
             text = data['call'].upper()
@@ -83,6 +87,8 @@ class Main(tk.Frame):
                     self.buttons[idx].config(bg=self.stcolor)
                 elif data['newDx']:
                     self.buttons[idx].config(bg=self.dxcolor)
+                elif data['newCall']:
+                    self.buttons[idx].config(bg=self.clcolor)
                 else:
                     self.buttons[idx].config(bg=self.cqcolor)
                 cmd = lambda: listener.send_reply(data)

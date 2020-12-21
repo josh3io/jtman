@@ -28,6 +28,7 @@ class Qsos:
             self.qso['bands'][band+'M'] = {'dxcc':{},'states':{},'calls':{}}
 
         self.lotwFile = lotwFile
+        self.loadingLotw = False
         self.reloadAge = reloadAge
         self.oldestLog = oldestLog
         self.adifFiles = []
@@ -67,11 +68,13 @@ class Qsos:
         
         
         log.debug("len {} age {} reloadAge {}".format(len(qsos),now-mtime,self.reloadAge))
-        if now - mtime > self.reloadAge or len(qsos) == 0:
+        if not self.loadingLotw and (now - mtime > self.reloadAge or len(qsos) == 0):
+            self.loadingLotw = True
             adifData = l.getReport(self.oldestLog)
             qsos, header = adif_io.read_from_string(str(adifData))
             with open(self.lotwFile,'wb') as f_out:
                 pickle.dump(qsos,f_out)
+            self.loadingLotw = False
         self.load_qsos(qsos)
 
     def loadCountryData(self):
@@ -123,6 +126,7 @@ class Qsos:
 
     def addQso(self,log_in):
         qso = capitalize_keys(log_in)
+        log.debug("addQso {}".format(qso))
 
         if 'STATE' in qso:
             self.qso["states"][qso['STATE']] = True

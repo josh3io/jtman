@@ -42,7 +42,10 @@ class Listener:
 
     def ifttt_event(self,event):
         if self.ifttt_key:
-            requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+self.ifttt_key)
+            try:
+                requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+self.ifttt_key)
+            except Exception as e:
+                info.debug('IFTTT failed: {}'.format(e))
 
     def print_line(self):
         now = datetime.now()
@@ -59,7 +62,7 @@ class Listener:
         #print('decode packet ',self.the_packet)
         try:
 
-            m = re.match(r"^CQ\s(\w{2}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
+            m = re.match(r"^CQ\s(\w{2,3}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
             if m:
                 #print("Callsign {}".format(m.group(1)))
                 directed = m.group(1)

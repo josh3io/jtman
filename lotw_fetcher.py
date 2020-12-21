@@ -19,7 +19,7 @@ class Fetcher:
         log.debug("logged into lotw")
 
 
-    def getReport(self,since='1901-01-01',call=''):
+    def getReport(self,since='1915-01-01',call=''):
         report_data = {
             'login' : self.username, 
             'password' : self.password,
@@ -37,4 +37,4 @@ class Fetcher:
         if content.startswith(b'ARRL Logbook of the World Status Report'):
             return resp.content
         else:
-            raise Exception('LOTW request failed. check your credentials. make sure LOTW_USERNAME and LOTW_PASSWORD environment variables are set.')
+            raise Exception('LOTW request failed. {}'.format(content))

@@ -141,7 +141,7 @@ class Qsos:
                 qso['DXCC'] = call_info['adif']
 
             self.qso["dxcc"][int(qso['DXCC'])] = True
-            self.qso["bands"][qso['BAND']]['dxcc'][qso['DXCC']] = True
+            self.qso["bands"][qso['BAND']]['dxcc'][int(qso['DXCC'])] = True
         except Exception as e:
             log.error("Failed to addQso {}: {}".format(qso,e))
 

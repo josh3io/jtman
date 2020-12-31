@@ -159,6 +159,7 @@ class Main(tk.Frame):
         self.buildGrid()
         
     def buildGrid(self):
+        '''
         for btn in self.buttons:
             btn.destroy()
 
@@ -166,6 +167,7 @@ class Main(tk.Frame):
             if oldpane is not None:
                 oldpane.destroy()
                 self.gridpane.remove(oldpane)
+        '''
 
         guiOpts = self.config['GUI_OPTS']
         self.rowcount = int(guiOpts.get('rowcount'))

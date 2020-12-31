@@ -21,7 +21,6 @@ class Listener:
         self.q = q
         self.unseen = []
         self.stopped = False
-        self.ifttt_key = self.config.get('OPTS','ifttt_key')
         self.ip_address = ip_address
         self.port = port
 
@@ -33,17 +32,20 @@ class Listener:
         if self.config.get('OPTS','load_adif_files_on_start'):
             for filepath in filePaths:
                 self.q.addAdifFile(filepath,True)
-            if self.config.get('LOTW','enable'):
-                username = self.config.get('LOTW','username')
-                password = self.config.get('LOTW','password')
-                if username and password:
-                    self.q.loadLotw(username,password)
+            self.loadLotw()
 
+    def loadLotw(self):
+        if self.config.get('LOTW','enable'):
+            username = self.config.get('LOTW','username')
+            password = self.config.get('LOTW','password')
+            if username and password:
+                self.q.loadLotw(username,password)
 
     def ifttt_event(self,event):
-        if self.ifttt_key:
+        ifttt_key = self.config.get('OPTS','ifttt_key')
+        if ifttt_key:
             try:
-                requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+self.ifttt_key)
+                requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+ifttt_key)
             except Exception as e:
                 info.debug('IFTTT failed: {}'.format(e))
 

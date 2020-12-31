@@ -17,6 +17,7 @@ class Main(tk.Frame):
         self.parent = parent
 
         self.info = tk.StringVar()
+        self.colorLegend = tk.StringVar()
         self.config = config
         log.setLevel(config.get('OPTS','loglevel').upper())
 
@@ -26,6 +27,8 @@ class Main(tk.Frame):
         self.stopping = False
         self.nextListens = []
         self.listeners = []
+        self.rows = []
+        self.buttons = []
 
         # config
         log.debug('config grid rows {} columns {}'
@@ -36,15 +39,24 @@ class Main(tk.Frame):
         self.rowcount = int(self.config.get('GUI_OPTS','rowcount'))
         self.columncount = int(self.config.get('GUI_OPTS','columncount'))
         self.maxIdx = self.rowcount * self.columncount
-        self.clcolor = self.config.get('GUI_OPTS','clcolor')
-        self.cqcolor = self.config.get('GUI_OPTS','cqcolor')
-        self.dxcolor = self.config.get('GUI_OPTS','dxcolor')
-        self.stcolor = self.config.get('GUI_OPTS','stcolor')
+        self.colors = {}
+        self.updateColorsFromConfig()
 
         self.initUi()
         self.initListeners()
         self.initButtonUpdate()
 
+    def updateColorsFromConfig(self):
+        guiOpts = self.config['GUI_OPTS']
+        self.colors = {
+            'blankColor': guiOpts.get('blankColor', guiOpts.get('blankcolor', 'gray')),
+            'cqColor': guiOpts.get('cqColor', guiOpts.get('cqcolor', 'khaki1')),
+            'newCallColor': guiOpts.get('newCallColor', guiOpts.get('clcolor', 'blue')),
+            'newStateColor': guiOpts.get('newStateColor', guiOpts.get('stcolor', 'orange')),
+            'newDxColor': guiOpts.get('newDxColor', guiOpts.get('dxcolor', 'red'))
+        }
+        log.debug("COLORS {}".format(self.colors))
+        
     def initUi(self):
         self.initMenu()
         self.initGrid()
@@ -57,15 +69,35 @@ class Main(tk.Frame):
 
         self.menu.add_cascade(label="File", menu=filem)
 
+
+        toolsm = tk.Menu(self.menu, tearoff=0)
+        toolsm.add_command(label="Reload config", command=self.reloadConfig)
+        toolsm.add_command(label="Reload LOTW", command=self.reloadLotw)
+
+        self.menu.add_cascade(label="Tools", menu=toolsm)
+
         self.parent.config(menu=self.menu)
 
+    def reloadConfig(self):
+        self.config.read(self.config.get('_','configFile'))
+
+        self.updateColorsFromConfig()
+        log.setLevel(self.config.get('OPTS','loglevel').upper())
+
+        self.buildGrid()
+
+    def reloadLotw(self):
+        try:
+            self.listeners[0].loadLotw()
+        except Exception as e:
+            log.error('Failed to reload LOTW: {}'.format(e))
 
     def updateButton(self,idx,listener,data):
         def noop():
             pass
         if data == None:
             self.buttons[idx].config(text="             ")
-            self.buttons[idx].config(bg="grey")
+            self.buttons[idx].config(bg=self.colors.get('blankColor'))
             self.buttons[idx].config(command=noop)
         else:
             log.debug("update button "+str(idx)+" with call "+data['call'])
@@ -84,17 +116,17 @@ class Main(tk.Frame):
 
             if data['cq']:
                 if data['newState']:
-                    self.buttons[idx].config(bg=self.stcolor)
+                    self.buttons[idx].config(bg=self.colors.get('newStateColor'))
                 elif data['newDx']:
-                    self.buttons[idx].config(bg=self.dxcolor)
+                    self.buttons[idx].config(bg=self.colors.get('newDxColor'))
                 elif data['newCall']:
-                    self.buttons[idx].config(bg=self.clcolor)
+                    self.buttons[idx].config(bg=self.colors.get('newCallColor'))
                 else:
-                    self.buttons[idx].config(bg=self.cqcolor)
+                    self.buttons[idx].config(bg=self.colors.get('cqColor'))
                 cmd = lambda: listener.send_reply(data)
                 self.buttons[idx].config(command=cmd)
             else:
-                self.buttons[idx].config(bg='grey')
+                self.buttons[idx].config(bg=self.colors.get('blankColor'))
             self.buttons[idx].config(text=text)
                 
             
@@ -124,8 +156,27 @@ class Main(tk.Frame):
 
         self.gridpane.add(self.textInfo)
 
+        self.buildGrid()
+        
+    def buildGrid(self):
+        for btn in self.buttons:
+            btn.destroy()
+
+        for oldpane in self.rows:
+            if oldpane is not None:
+                oldpane.destroy()
+                self.gridpane.remove(oldpane)
+
+        guiOpts = self.config['GUI_OPTS']
+        self.rowcount = int(guiOpts.get('rowcount'))
+        self.columncount = int(guiOpts.get('columncount'))
+        self.maxIdx = self.rowcount * self.columncount
         self.rows = [None] * self.rowcount
         self.buttons = [None] * self.rowcount * self.columncount
+
+        buttonHeight = int(guiOpts.get('buttonHeight',100))
+        buttonWidth = int(guiOpts.get('buttonWidth',300))
+
 
         for r in range(self.rowcount):
             rowpane = tk.PanedWindow(self.gridpane)
@@ -135,7 +186,7 @@ class Main(tk.Frame):
             for c in range(self.columncount):
                 log.debug('add row {} column {}'.format(r,c))
                 idx = r*self.columncount + c
-                btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE, width=10,height=1)
+                btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE, width=buttonWidth,height=buttonHeight)
                 btn.pack()
                 rowpane.add(btn)
                 self.buttons[idx] = btn
@@ -228,9 +279,12 @@ class Main(tk.Frame):
                     log.debug('STOP LISTENER {}'.format(listener))
                     log.info("stop listener {}:{}".format(listener.ip_address,listener.port))
                     listener.stop()
+        except Exception as e:
+            log.error("exit caught while stopping: {}".format(e))
+        try:
             self.parent.destroy()
         except Exception as e:
-            log.info("exit caught {}".format(e))
+            log.info("exit caught while destroy: {}".format(e))
 
 class JtmanTk(tk.Frame):
     def __init__(self, parent, config, *args, **kwargs):
@@ -238,7 +292,11 @@ class JtmanTk(tk.Frame):
         self.parent = parent
 
         self.Main = Main(self.parent, config)
-        signal(SIGINT, self.Main.exit)
+        signal(SIGINT, self.handleSigint)
+
+    def handleSigint(self):
+        self.Main.exit()
+        self.parent.destroy()
 
     def setListener(self,l):
         self.Main.setListener(l)

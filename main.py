@@ -9,7 +9,10 @@ from logger import LOGGER as log
 import sys
 configFile = os.getenv('CONFIG')
 config = ConfigParser()
+config.read_file(open('config.ini'))
 config.read(configFile)
+config.add_section('_')
+config.set('_','configFile', configFile)
 
 
 # set env GUI to zero, or env GUI is unset and GUI disabled in config

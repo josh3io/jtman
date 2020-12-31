@@ -84,7 +84,7 @@ class Main(tk.Frame):
         self.updateColorsFromConfig()
         log.setLevel(self.config.get('OPTS','loglevel').upper())
 
-        self.buildGrid()
+        #self.buildGrid()
 
     def reloadLotw(self):
         try:

@@ -180,6 +180,7 @@ class Qsos:
         )
 
     def needDx(self,band,dx):
+        log.debug("NEED DX band {} dx {}; dxcc {} bands dxcc {}".format(band,dx,self.qso['dxcc'],self.qso['bands'][band]['dxcc']))
         return (dx != False and 
             (  dx not in self.qso["dxcc"] 
             or dx not in self.qso['bands'][band]['dxcc']

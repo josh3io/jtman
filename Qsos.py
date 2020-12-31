@@ -128,19 +128,22 @@ class Qsos:
         qso = capitalize_keys(log_in)
         log.debug("addQso {}".format(qso))
 
-        if 'STATE' in qso:
-            self.qso["states"][qso['STATE']] = True
-            self.qso["bands"][qso['BAND']]['states'][qso['STATE']] = True
+        try:
+            if 'STATE' in qso:
+                self.qso["states"][qso['STATE']] = True
+                self.qso["bands"][qso['BAND']]['states'][qso['STATE']] = True
 
-        self.qso["calls"][qso['CALL']] = True
-        self.qso["bands"][qso['BAND']]['calls'][qso['CALL']] = True
+            self.qso["calls"][qso['CALL']] = True
+            self.qso["bands"][qso['BAND']]['calls'][qso['CALL']] = True
 
-        if 'DXCC' not in qso:
-            call_info = self.cic.get_all(qso['CALL'])
-            qso['DXCC'] = call_info['adif']
+            if 'DXCC' not in qso:
+                call_info = self.cic.get_all(qso['CALL'])
+                qso['DXCC'] = call_info['adif']
 
-        self.qso["dxcc"][int(qso['DXCC'])] = True
-        self.qso["bands"][qso['BAND']]['dxcc'][qso['DXCC']] = True
+            self.qso["dxcc"][int(qso['DXCC'])] = True
+            self.qso["bands"][qso['BAND']]['dxcc'][qso['DXCC']] = True
+        except Exception as e:
+            log.error("Failed to addQso {}: {}".format(qso,e))
 
     def loadCallStateData(self,filepath):
         self.callstate={}
@@ -166,7 +169,7 @@ class Qsos:
 
     def needCall(self,band,callsign):
         return (callsign not in self.qso['calls'] 
-            or callsign in self.qso['bands'][band]['calls']
+            and callsign not in self.qso['bands'][band]['calls']
         )
 
     def needState(self,band,state):

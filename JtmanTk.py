@@ -29,6 +29,7 @@ class Main(tk.Frame):
         self.listeners = []
         self.rows = []
         self.buttons = []
+        self.colorInfo = {}
 
         # config
         log.debug('config grid rows {} columns {}'
@@ -55,6 +56,13 @@ class Main(tk.Frame):
             'newStateColor': guiOpts.get('newStateColor', guiOpts.get('stcolor', 'orange')),
             'newDxColor': guiOpts.get('newDxColor', guiOpts.get('dxcolor', 'red'))
         }
+        try:
+            self.setColorInfo('newDxColor', 'new DX', True)
+            self.setColorInfo('newStateColor', 'new State', True)
+            self.setColorInfo('newCallColor', 'new Call', True)
+            self.setColorInfo('cqColor', 'calling CQ', True)
+        except Exception as e:
+            pass
         log.debug("COLORS {}".format(self.colors))
         
     def initUi(self):
@@ -148,15 +156,30 @@ class Main(tk.Frame):
 
 
     def initGrid(self):
-        self.gridpane = tk.PanedWindow(orient=tk.VERTICAL)
+        self.gridpane = tk.Frame()
         self.gridpane.pack(fill=tk.BOTH, expand=1)
 
-        self.info.set(default_info)
-        self.textInfo = tk.Label(self.gridpane, textvariable=self.info, relief=tk.RAISED)
+        self.infoFrame = tk.Frame(self.gridpane)
+        self.infoFrame.pack(fill=tk.BOTH, expand=1)
 
-        self.gridpane.add(self.textInfo)
+        self.info.set(default_info)
+        self.textInfo = tk.Label(self.infoFrame, textvariable=self.info, relief=tk.RAISED)
+        self.textInfo.pack(side=tk.LEFT)
+
+        self.setColorInfo('newDxColor', 'new DX')
+        self.setColorInfo('newStateColor', 'new State')
+        self.setColorInfo('newCallColor', 'new Call')
+        self.setColorInfo('cqColor', 'calling CQ')
 
         self.buildGrid()
+
+    def setColorInfo(self,key, colorText, update=False):
+        if update:
+            self.colorInfo[key].config(bg=self.colors.get(key))
+        else:
+            self.colorInfo[key] = tk.Label(self.infoFrame, text=colorText, background=self.colors.get(key))
+            self.colorInfo[key].pack(side=tk.RIGHT, padx=5, pady=5 )
+
         
     def buildGrid(self):
         '''
@@ -181,16 +204,14 @@ class Main(tk.Frame):
 
 
         for r in range(self.rowcount):
-            rowpane = tk.PanedWindow(self.gridpane)
+            rowpane = tk.Frame(self.gridpane)
             rowpane.pack()
-            self.gridpane.add(rowpane)
             self.rows[r] = rowpane
             for c in range(self.columncount):
                 log.debug('add row {} column {}'.format(r,c))
                 idx = r*self.columncount + c
                 btn = tk.Button(rowpane, text="              ", relief=tk.RIDGE, width=buttonWidth,height=buttonHeight)
-                btn.pack()
-                rowpane.add(btn)
+                btn.pack(side=tk.LEFT)
                 self.buttons[idx] = btn
 
     def initListeners(self):
@@ -296,7 +317,7 @@ class JtmanTk(tk.Frame):
         self.Main = Main(self.parent, config)
         signal(SIGINT, self.handleSigint)
 
-    def handleSigint(self):
+    def handleSigint(self,signum=None,frame=None):
         self.Main.exit()
         self.parent.destroy()
 

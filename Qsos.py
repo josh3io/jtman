@@ -140,8 +140,9 @@ class Qsos:
                 call_info = self.cic.get_all(qso['CALL'])
                 qso['DXCC'] = call_info['adif']
 
-            self.qso["dxcc"][int(qso['DXCC'])] = True
-            self.qso["bands"][qso['BAND']]['dxcc'][int(qso['DXCC'])] = True
+            intDx = int(qso['DXCC'])
+            self.qso["dxcc"][intDx] = True
+            self.qso["bands"][qso['BAND']]['dxcc'][intDx] = True
         except Exception as e:
             log.error("Failed to addQso {}: {}".format(qso,e))
 

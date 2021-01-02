@@ -21,7 +21,7 @@ def capitalize_keys(d):
 
 
 class Qsos:
-    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.dat',callStateFile="./call_state.dat",countryCodeCsv="./country_codes.csv"):
+    def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.dat',callStateFile="./call_state.dat",countryCodeCsv="./country_codes.csv", defer=False):
         self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
 
         for band in ['160','80','40','30','20','17','15','12','10','6','2']:
@@ -34,10 +34,20 @@ class Qsos:
         self.adifFiles = []
         self.adifFilesLastChange = {}
         self.countryCodes = {'byCode':{}, 'byName':{}}
+        self.callstate={}
         self.scanThread = None
-        self.loadCountryCodes(countryCodeCsv)
+        self.countryCodeCsv = countryCodeCsv
+        self.callStateFile=callStateFile
+        self.defered = defer
+
+        if not defer:
+            self.loadData()
+
+    def loadData(self):
+        self.loadCountryCodes(self.countryCodeCsv)
         self.loadCountryData()
-        self.loadCallStateData(callStateFile)
+        self.loadCallStateData(self.callStateFile)
+        self.defered = False
 
     def loadCountryCodes(self,filename):
         with open(filename) as fin:
@@ -112,6 +122,8 @@ class Qsos:
         self.scanThread.cancel()
 
     def scanLogFiles(self):
+        if self.defered:
+            return
         log.debug("scanning logfiles")
         for filepath in self.adifFiles:
             m = os.stat(filepath).st_mtime
@@ -147,7 +159,6 @@ class Qsos:
             log.error("Failed to addQso {}: {}".format(qso,e))
 
     def loadCallStateData(self,filepath):
-        self.callstate={}
         with open(filepath) as fin:
             reader=csv.reader(fin, skipinitialspace=True, delimiter='|', quotechar="'")
             for row in reader:

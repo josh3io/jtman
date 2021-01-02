@@ -143,7 +143,7 @@ class Listener:
             self.addr_port = None
 
     def listen(self):
-        self.t = threading.Thread(target=self.doListen)
+        self.t = threading.Thread(target=self.doListen, daemon=True)
         log.info("Listener started "+self.ip_address+":"+str(self.port))
         self.t.start()
 

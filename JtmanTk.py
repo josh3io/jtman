@@ -21,7 +21,7 @@ class Main(tk.Frame):
         self.config = config
         log.setLevel(config.get('OPTS','loglevel').upper())
 
-        self.q = Qsos.Qsos(lotwFile=config.get('LOTW','cache_filename'))
+        self.q = Qsos.Qsos(lotwFile=config.get('LOTW','cache_filename'), defer=True)
         self.q.startScan()
 
         self.stopping = False
@@ -46,6 +46,9 @@ class Main(tk.Frame):
         self.initUi()
         self.initListeners()
         self.initButtonUpdate()
+        loadDataThread = threading.Thread(target=self.q.loadData, daemon=True)
+        loadDataThread.start()
+
 
     def updateColorsFromConfig(self):
         guiOpts = self.config['GUI_OPTS']
@@ -105,7 +108,7 @@ class Main(tk.Frame):
             pass
         if data == None:
             self.buttons[idx].config(text="             ")
-            self.buttons[idx].config(bg=self.colors.get('blankColor'))
+            self.buttons[idx].config(background=self.colors.get('blankColor'))
             self.buttons[idx].config(command=noop)
         else:
             log.debug("update button "+str(idx)+" with call "+data['call'])
@@ -124,17 +127,17 @@ class Main(tk.Frame):
 
             if data['cq']:
                 if data['newState']:
-                    self.buttons[idx].config(bg=self.colors.get('newStateColor'))
+                    self.buttons[idx].config(background=self.colors.get('newStateColor'))
                 elif data['newDx']:
-                    self.buttons[idx].config(bg=self.colors.get('newDxColor'))
+                    self.buttons[idx].config(background=self.colors.get('newDxColor'))
                 elif data['newCall']:
-                    self.buttons[idx].config(bg=self.colors.get('newCallColor'))
+                    self.buttons[idx].config(background=self.colors.get('newCallColor'))
                 else:
-                    self.buttons[idx].config(bg=self.colors.get('cqColor'))
+                    self.buttons[idx].config(background=self.colors.get('cqColor'))
                 cmd = lambda: listener.send_reply(data)
                 self.buttons[idx].config(command=cmd)
             else:
-                self.buttons[idx].config(bg=self.colors.get('blankColor'))
+                self.buttons[idx].config(background=self.colors.get('blankColor'))
             self.buttons[idx].config(text=text)
                 
             
@@ -159,11 +162,11 @@ class Main(tk.Frame):
         self.gridpane = tk.Frame()
         self.gridpane.pack(fill=tk.BOTH, expand=1)
 
-        self.infoFrame = tk.Frame(self.gridpane)
+        self.infoFrame = tk.Frame(self.gridpane, relief=tk.RAISED)
         self.infoFrame.pack(fill=tk.BOTH, expand=1)
 
         self.info.set(default_info)
-        self.textInfo = tk.Label(self.infoFrame, textvariable=self.info, relief=tk.RAISED)
+        self.textInfo = tk.Label(self.infoFrame, textvariable=self.info)
         self.textInfo.pack(side=tk.LEFT)
 
         self.setColorInfo('newDxColor', 'new DX')

@@ -41,13 +41,16 @@ class Listener:
             if username and password:
                 self.q.loadLotw(username,password)
 
-    def ifttt_event(self,event):
-        ifttt_key = self.config.get('OPTS','ifttt_key')
-        if ifttt_key:
+    def webhook_event(self,event):
+        events = self.config.get('WEBHOOKS','events').split(',')
+        for webhook in self.config.get('WEBHOOKS','hooks').splitlines():
             try:
-                requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+ifttt_key)
+                for sendEvent in events:
+                    if event[sendEvent]:
+                        requests.post(webhook, data=event)
+                        break
             except Exception as e:
-                info.debug('IFTTT failed: {}'.format(e))
+                log.warn('webhook {} failed: event {} error {}'.format(webhook,event,e))
 
     def print_line(self):
         now = datetime.now()
@@ -61,6 +64,8 @@ class Listener:
         self.s.send_packet(data['addr_port'], packet)
 
     def parse_packet(self):
+        if self.q.defered:
+            return
         #print('decode packet ',self.the_packet)
         try:
 
@@ -84,16 +89,16 @@ class Listener:
                 needData['addr_port'] = self.addr_port
                 self.unseen.append(needData)
 
+                threading.Thread(target=self.webhook_event,args=(needData),daemon=True)
+
                 if needData['newState'] == True:
                     log.info(colored("NEW STATE {} {}".format(callsign,needData['state']), 'magenta', 'on_white'))
                     bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
                     fg=pywsjtx.QCOLOR.Black()
-                    self.ifttt_event('qso_was')
                 elif needData['newDx'] == True:
                     log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
                     bg=pywsjtx.QCOLOR.Red()
                     fg=pywsjtx.QCOLOR.White()
-                    self.ifttt_event('qso_dxcc')
                 elif needData['newCall'] == True:
                     log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
                     bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)

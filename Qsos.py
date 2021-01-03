@@ -39,6 +39,7 @@ class Qsos:
         self.countryCodeCsv = countryCodeCsv
         self.callStateFile=callStateFile
         self.defered = defer
+        self.lotwLock = threading.Lock()
 
         if not defer:
             self.loadData()
@@ -78,8 +79,10 @@ class Qsos:
         
         
         log.debug("len {} age {} reloadAge {}".format(len(qsos),now-mtime,self.reloadAge))
+        self.lotwLock.acquire()
+        self.loadingLotw = True
+        self.lotwLock.release()
         if not self.loadingLotw and (now - mtime > self.reloadAge or len(qsos) == 0):
-            self.loadingLotw = True
             adifData = l.getReport(self.oldestLog)
             qsos, header = adif_io.read_from_string(str(adifData))
             with open(self.lotwFile,'wb') as f_out:
@@ -138,7 +141,7 @@ class Qsos:
 
     def addQso(self,log_in):
         qso = capitalize_keys(log_in)
-        log.debug("addQso {}".format(qso))
+        #log.debug("addQso {}".format(qso))
 
         try:
             if 'STATE' in qso:
@@ -165,6 +168,8 @@ class Qsos:
                 self.callstate[row[0]]=row[1]
 
     def needDataByBandAndCall(self,band,callsign):
+        if self.defered:
+            return
         callsign = callsign.strip()
         (dx, country, code) = self.dx(band,callsign)
         state = self.state(band,callsign)
@@ -187,12 +192,11 @@ class Qsos:
     def needState(self,band,state):
         return  (state != "" and
             (state not in self.qso["states"] 
-            or state not in self.qso['bands'][band]['states']
+            and state not in self.qso['bands'][band]['states']
             )
         )
 
     def needDx(self,band,dx):
-        log.debug("NEED DX band {} dx {}; dxcc {} bands dxcc {}".format(band,dx,self.qso['dxcc'],self.qso['bands'][band]['dxcc']))
         return (dx != False and 
             (  dx not in self.qso["dxcc"] 
             or dx not in self.qso['bands'][band]['dxcc']

@@ -22,6 +22,7 @@ if os.getenv('GUI') == '0' or config.get('OPTS','gui') == 0 or config.get('OPTS'
 else:
     log.debug("gui enabled")
     mainWindow = tk.Tk()
+    mainWindow.title('Jtman alert manager')
     app = JtmanTk(mainWindow, config)
     mainWindow.mainloop()
 

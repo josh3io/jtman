@@ -9,13 +9,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.append("./pywsjtx")
 from wsjtx_listener import Listener
 
-default_info = 'Jtman alert manager'
+default_info = ''
 
 class Main(tk.Frame):
     def __init__(self, parent, config):
         tk.Frame.__init__(self, parent)
         self.parent = parent
 
+        self.call=''
+        self.band=''
+        self.statusMsg=''
         self.info = tk.StringVar()
         self.colorLegend = tk.StringVar()
         self.config = config
@@ -44,11 +47,27 @@ class Main(tk.Frame):
         self.updateColorsFromConfig()
 
         self.initUi()
-        self.initListeners()
-        self.initButtonUpdate()
         loadDataThread = threading.Thread(target=self.q.loadData, daemon=True)
         loadDataThread.start()
 
+        infoLoadingThread = threading.Timer(2, self.infoLoadingUpdater)
+        infoLoadingThread.start()
+
+    def infoLoadingUpdater(self):
+        if self.q.defered:
+            dots=self.statusMsg.count('.')
+            if dots == 3:
+                dots=1
+            else:
+                dots = dots + 1
+
+            self.updateStatusMessage(status='Loading'+('.'*dots))
+            infoLoadingThread = threading.Timer(0.5, self.infoLoadingUpdater)
+            infoLoadingThread.start()
+        else:
+            self.updateStatusMessage(status='')
+            self.initListeners()
+            self.initButtonUpdate()
 
     def updateColorsFromConfig(self):
         guiOpts = self.config['GUI_OPTS']
@@ -141,21 +160,20 @@ class Main(tk.Frame):
             self.buttons[idx].config(text=text)
                 
             
-    def updateStatusMessage(self,bands=None,call=None):
+    def updateStatusMessage(self,bands=None,call=None,status=None):
         log.debug('updateStatusMessage call {}; bands {}'.format(call,bands))
         info_str = ''
         if call != None:
             self.call = call
-            info_str = 'Operating as '+call
         if bands != None and len(bands) > 0:
             if len(bands) == 1:
                 s=''
             else:
                 s='s'
-            if call != None:
-                info_str = info_str + ' | '
-            info_str = info_str + 'band{} {}'.format(s,','.join(bands))
-        self.info.set(' | '.join([default_info,info_str]))
+            self.band = 'band{} {}'.format(s,','.join(bands))
+        if status != None:
+            self.statusMsg = status
+        self.info.set(' | '.join([self.call,self.band,self.statusMsg]))
 
 
     def initGrid(self):

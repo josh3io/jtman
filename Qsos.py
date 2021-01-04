@@ -22,10 +22,10 @@ def capitalize_keys(d):
 
 class Qsos:
     def __init__(self,oldestLog='1901-01-20',reloadAge=86400,lotwFile='lotw.dat',callStateFile="./call_state.dat",countryCodeCsv="./country_codes.csv", defer=False):
-        self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{}}
+        self.qso = {"calls":{},"bands":{},"states":{},"dxcc":{},"grids":{}}
 
         for band in ['160','80','40','30','20','17','15','12','10','6','2']:
-            self.qso['bands'][band+'M'] = {'dxcc':{},'states':{},'calls':{}}
+            self.qso['bands'][band+'M'] = {'dxcc':{},'states':{},'calls':{},'grids':{}}
 
         self.lotwFile = lotwFile
         self.loadingLotw = False
@@ -141,7 +141,19 @@ class Qsos:
 
     def addQso(self,log_in):
         qso = capitalize_keys(log_in)
-        #log.debug("addQso {}".format(qso))
+        log.debug("addQso {}".format(qso))
+
+        if not qso.get('GRID'):
+            for sq in ('','4','6','8','10'):
+                gridkey = 'GRIDSQUARE'+sq
+                log.debug("check for grid {}: {}".format(gridkey, qso.get(gridkey),False))
+                if qso.get(gridkey, False):
+                    qso['GRID'] = qso.get(gridkey)[:4]
+                    break
+            if not qso.get('GRID'):
+                qso['GRID'] = qso.get('APP_LOTW_GRIDSQUARE_INVALID',None)
+        
+        log.debug('grid {}'.format(qso['GRID']))
 
         try:
             if 'STATE' in qso:
@@ -150,6 +162,9 @@ class Qsos:
 
             self.qso["calls"][qso['CALL']] = True
             self.qso["bands"][qso['BAND']]['calls'][qso['CALL']] = True
+
+            self.qso["grids"][qso['GRID']] = True
+            self.qso["bands"][qso['BAND']]['grids'][qso['GRID']] = True
 
             if 'DXCC' not in qso:
                 call_info = self.cic.get_all(qso['CALL'])
@@ -167,7 +182,7 @@ class Qsos:
             for row in reader:
                 self.callstate[row[0]]=row[1]
 
-    def needDataByBandAndCall(self,band,callsign):
+    def needDataByBandAndCall(self,band,callsign,grid):
         if self.defered:
             return
         callsign = callsign.strip()
@@ -179,10 +194,16 @@ class Qsos:
             'country': country,
             'code': code,
             'state': state,
+            'grid': grid,
             'newDx': self.needDx(band,dx),
             'newState': self.needState(band,state),
-            'newCall': self.needCall(band,callsign)
+            'newCall': self.needCall(band,callsign),
+            'newGrid': self.needGrid(band,grid)
         }
+
+    def needGrid(self, band, grid):
+        return (not self.qso['grids'].get(grid,False)
+            or not self.qso['bands'][band]['grids'].get(grid,False))
 
     def needCall(self,band,callsign):
         return not (callsign in self.qso['calls'] 
@@ -190,15 +211,15 @@ class Qsos:
         )
 
     def needState(self,band,state):
-        return  (state != ""
-            and state not in self.qso["states"] 
-            and state not in self.qso['bands'][band]['states']
+        return  (state != "" and 
+            (state not in self.qso["states"] 
+            or state not in self.qso['bands'][band]['states'])
         )
 
     def needDx(self,band,dx):
-        return (dx != False
-            and dx not in self.qso["dxcc"] 
-            and dx not in self.qso['bands'][band]['dxcc']
+        return (dx != False and
+            dx not in self.qso["dxcc"] 
+            or dx not in self.qso['bands'][band]['dxcc']
         )
 
     def codeByName(self,name):

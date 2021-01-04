@@ -80,7 +80,9 @@ class Listener:
                 self.print_line()
 
                 msg = callsign
-                needData = self.q.needDataByBandAndCall(self.band,callsign)
+                print("D1")
+                needData = self.q.needDataByBandAndCall(self.band,callsign,grid)
+                print("D2")
                 needData['cuarto'] = 15 * (datetime.now().second // 15)
                 needData['directed'] = directed
                 needData['call'] = callsign
@@ -101,6 +103,11 @@ class Listener:
                     log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
                     bg=pywsjtx.QCOLOR.Red()
                     fg=pywsjtx.QCOLOR.White()
+                elif needData['newGrid'] == True:
+                    log.info(colored("NEW GRID {} {} {}".format(callsign,needData['grid'],needData['country']), 'white', 'on_blue'))
+                    bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
+                    fg=pywsjtx.QCOLOR.White()
+                    msg = msg + ' NEW CALL'
                 elif needData['newCall'] == True:
                     log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
                     bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
@@ -173,8 +180,8 @@ class Listener:
 
     def update_log(self):
         log.debug("update log".format(self.the_packet))
-        nd = self.q.needDataByBandAndCall(self.band,self.the_packet.call)
-        log.debug("update_log call {} needData {}".format(self.the_packet.call,nd))
+        nd = self.q.needDataByBandAndCall(self.band,self.the_packet.call,self.the_packet.grid)
+        log.debug("update_log call {} grid {} needData {}".format(self.the_packet.call,self.the_packet.grid,nd))
         try:
             qso = { 'CALL': self.the_packet.call, 'DXCC': nd['dx'], 'BAND': self.band }
             if nd['state'] in nd:

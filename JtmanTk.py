@@ -72,20 +72,14 @@ class Main(tk.Frame):
     def updateColorsFromConfig(self):
         guiOpts = self.config['GUI_OPTS']
         self.colors = {
-            'blankColor': guiOpts.get('blankColor', guiOpts.get('blankcolor', 'gray')),
-            'cqColor': guiOpts.get('cqColor', guiOpts.get('cqcolor', 'khaki1')),
-            'newCallColor': guiOpts.get('newCallColor', guiOpts.get('clcolor', 'blue')),
-            'newStateColor': guiOpts.get('newStateColor', guiOpts.get('stcolor', 'orange')),
+            'blankColor': guiOpts.get('blankColor', guiOpts.get('blankcolor', 'lavender')),
+            'cqColor': guiOpts.get('cqColor', guiOpts.get('cqcolor', 'brown')),
+            'newCallColor': guiOpts.get('newCallColor', guiOpts.get('clcolor', 'green')),
+            'newGridColor': guiOpts.get('newGridColor', guiOpts.get('gridcolor', 'orange')),
+            'newStateColor': guiOpts.get('newStateColor', guiOpts.get('stcolor', 'yellow')),
             'newDxColor': guiOpts.get('newDxColor', guiOpts.get('dxcolor', 'red'))
         }
-        try:
-            self.setColorInfo('newDxColor', 'new DX', True)
-            self.setColorInfo('newStateColor', 'new State', True)
-            self.setColorInfo('newCallColor', 'new Call', True)
-            self.setColorInfo('cqColor', 'calling CQ', True)
-        except Exception as e:
-            pass
-        log.debug("COLORS {}".format(self.colors))
+        self.setAllColorInfo(update=True)
         
     def initUi(self):
         self.initMenu()
@@ -145,14 +139,15 @@ class Main(tk.Frame):
                     text = "* "+text
 
             if data['cq']:
-                if data['newState']:
-                    self.buttons[idx].config(background=self.colors.get('newStateColor'))
-                elif data['newDx']:
-                    self.buttons[idx].config(background=self.colors.get('newDxColor'))
-                elif data['newCall']:
-                    self.buttons[idx].config(background=self.colors.get('newCallColor'))
-                else:
+                isSet=False
+                for field in ('newState','newDx','newGrid','newCall'):
+                    if data[field]:
+                        self.buttons[idx].config(background=self.colors.get(field+'Color'))
+                        isSet=True
+                        break
+                if not isSet:
                     self.buttons[idx].config(background=self.colors.get('cqColor'))
+
                 cmd = lambda: listener.send_reply(data)
                 self.buttons[idx].config(command=cmd)
             else:
@@ -187,20 +182,27 @@ class Main(tk.Frame):
         self.textInfo = tk.Label(self.infoFrame, textvariable=self.info)
         self.textInfo.pack(side=tk.LEFT)
 
-        self.setColorInfo('newDxColor', 'new DX')
-        self.setColorInfo('newStateColor', 'new State')
-        self.setColorInfo('newCallColor', 'new Call')
-        self.setColorInfo('cqColor', 'calling CQ')
+        self.setAllColorInfo(update=False)
 
         self.buildGrid()
 
-    def setColorInfo(self,key, colorText, update=False):
-        if update:
-            self.colorInfo[key].config(bg=self.colors.get(key))
-        else:
-            self.colorInfo[key] = tk.Label(self.infoFrame, text=colorText, background=self.colors.get(key))
-            self.colorInfo[key].pack(side=tk.RIGHT, padx=5, pady=5 )
+    def setAllColorInfo(self, update):
+        self.setColorInfo('newDxColor', 'new DX', update)
+        self.setColorInfo('newStateColor', 'new State', update)
+        self.setColorInfo('newGridColor', 'new Grid', update)
+        self.setColorInfo('newCallColor', 'new Call', update)
+        self.setColorInfo('cqColor', 'seen CQ', update)
 
+    def setColorInfo(self, key, colorText, update):
+        try:
+            if update:
+                self.colorInfo[key].config(bg=self.colors.get(key))
+            else:
+                self.colorInfo[key] = tk.Label(self.infoFrame, text=colorText, background=self.colors.get(key))
+                self.colorInfo[key].pack(side=tk.RIGHT, padx=5, pady=5 )
+        except Exception as e:
+            log.debug("failed to set color info {}, {}, {}".format(key,colorText,update))
+            pass
         
     def buildGrid(self):
         '''

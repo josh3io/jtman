@@ -185,22 +185,20 @@ class Qsos:
         }
 
     def needCall(self,band,callsign):
-        return (callsign not in self.qso['calls'] 
-            and callsign not in self.qso['bands'][band]['calls']
+        return not (callsign in self.qso['calls'] 
+            and callsign in self.qso['bands'][band]['calls']
         )
 
     def needState(self,band,state):
-        return  (state != "" and
-            (state not in self.qso["states"] 
+        return  (state != ""
+            and state not in self.qso["states"] 
             and state not in self.qso['bands'][band]['states']
-            )
         )
 
     def needDx(self,band,dx):
-        return (dx != False and 
-            (  dx not in self.qso["dxcc"] 
-            or dx not in self.qso['bands'][band]['dxcc']
-            )
+        return (dx != False
+            and dx not in self.qso["dxcc"] 
+            and dx not in self.qso['bands'][band]['dxcc']
         )
 
     def codeByName(self,name):

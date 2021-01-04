@@ -81,12 +81,14 @@ class Listener:
 
                 msg = callsign
                 needData = self.q.needDataByBandAndCall(self.band,callsign)
+                needData['cuarto'] = 15 * (datetime.now().second // 15)
                 needData['directed'] = directed
                 needData['call'] = callsign
                 needData['grid'] = grid
                 needData['cq'] = True
                 needData['packet'] = self.the_packet
                 needData['addr_port'] = self.addr_port
+                log.debug("listener needData {}".format(needData))
                 self.unseen.append(needData)
 
                 threading.Thread(target=self.webhook_event,args=(needData),daemon=True)
@@ -123,6 +125,7 @@ class Listener:
                     needData2['call'] = call2
                     needData2['cq'] = False
                     if needData1['call'] and needData2['call']:
+                        needData2['cuarto'] = 15 * (datetime.now().second // 15)
                         self.unseen.append(needData2)
 
             pass
@@ -160,7 +163,7 @@ class Listener:
         self.s.send_packet(self.addr_port, reply_beat_packet)
 
     def update_status(self):
-        log.debug('wsjt-x status {}'.format(self.the_packet))
+        #log.debug('wsjt-x status {}'.format(self.the_packet))
         try:
             bandinfo = freq_to_band(self.the_packet.dial_frequency/1000)
             self.call = self.the_packet.de_call

@@ -65,9 +65,9 @@ class Main(tk.Frame):
             infoLoadingThread = threading.Timer(0.5, self.infoLoadingUpdater)
             infoLoadingThread.start()
         else:
-            self.updateStatusMessage(status='')
+            self.updateStatusMessage(status='Listening')
             self.initListeners()
-            self.initButtonUpdate()
+            self.loopButtonUpdate()
 
     def updateColorsFromConfig(self):
         guiOpts = self.config['GUI_OPTS']
@@ -133,9 +133,9 @@ class Main(tk.Frame):
             log.debug("update button "+str(idx)+" with call "+data['call'])
             text = data['call'].upper()
 
-            if data['newState'] and data['state']:
+            if data['state']:
                 text = text + " - " + data['state']
-            elif data['newDx'] and data['code']:
+            elif data['code']:
                 text = text + "; " + data['code']
 
             if data['cq']:
@@ -250,70 +250,95 @@ class Main(tk.Frame):
         listenerIdx = len(self.listeners)
         log.debug("listener set "+str(listenerIdx))
 
-    def updateFromListener(self,listener,buttonIdx):
-        log.debug("Processing unseen count {} current buttonIdx {}, max {}".format(len(listener.unseen), buttonIdx, self.maxIdx))
+    def updateFromListener(self,listener,buttonIdx,seen):
+        band = listener.band
+        now = datetime.now()
+        nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
+        curtime = 15*(now.second //15)
+        #log.debug("Processing band {} time {} unseen count {} current buttonIdx {}, max {}".format(band,curtime,len(listener.unseen), buttonIdx, self.maxIdx))
         while len(listener.unseen) > 0 and buttonIdx < self.maxIdx:
             data = listener.unseen.pop(0)
-            log.debug("listener check {}; {}".format(buttonIdx,data))
-            self.updateButton(buttonIdx,listener,data)
-            buttonIdx += 1
+            #log.debug("unseen data {}".format(data))
+            logtime = data['cuarto']
+            seenstr = data['call'] + band
+            isSeen = seen.get(seenstr,False)
+            #log.info("seen {}={} curtime {} logtime {} sum {}".format(seenstr,isSeen,curtime,logtime,curtime+logtime))
+            if not isSeen:
+                seen[seenstr] = True
+                log.debug("listener check {}; {}".format(buttonIdx,data))
+                self.updateButton(buttonIdx,listener,data)
+                buttonIdx += 1
         return buttonIdx
 
-    def initButtonUpdate(self):
-        def f():
-            if len(self.listeners) > 0:
-                # clear buttons
-                for idx in range(self.maxIdx):
-                    self.updateButton(idx,None,None)
+    def clearButtons(self):
+        for idx in range(self.maxIdx):
+            self.updateButton(idx,None,None)
 
-                # get the latest call and band info
-                # and update the status message bar
-                listener_bands = []
-                for listener in self.listeners:
-                    if listener.band != None:
-                        listener_bands.append(listener.band)
-                self.updateStatusMessage(call=self.listeners[0].call,bands=listener_bands)
+    def getLatestInfo(self):
+        listener_bands = []
+        for listener in self.listeners:
+            if listener.band != None:
+                listener_bands.append(listener.band)
+        self.updateStatusMessage(call=self.listeners[0].call,bands=listener_bands)
 
-                # try for 5 seconds to collect decodes 
-                # from all attached listeners
-                # try twice a second
-                # it's cheap
-                # ¿por qué no?
-                buttonIdx = 0
-                for seconds in range(10):
-                    for listener in self.listeners:
-                        # get the list of calls and increment the button
-                        buttonIdx = self.updateFromListener(listener,buttonIdx)
-                        if buttonIdx > self.maxIdx:
-                            break
-                    if buttonIdx > self.maxIdx:
-                        break
-                    time.sleep(0.5)
+    def collectListenerDecodes(self, buttonIdx, seen):
+        for listener in self.listeners:
+            # get the list of calls and increment the button
+            try:
+                buttonIdx = self.updateFromListener(listener,buttonIdx,seen)
+                if buttonIdx > self.maxIdx:
+                    break
+            except Exception as e:
+                log.error("Failed to update from listener: {}".format(e))
+        return buttonIdx
 
+    def clearAllListenerUnseen(self):
+        for listener in self.listeners:
+            listener.unseen = []
 
-                # make sure we start fresh next time
-                # if we surpassed the max number of
-                # displayable calls we don't want to
-                # show stale info
-                for listener in self.listeners:
-                    listener.unseen = []
+    def runButtonUpdate(self):
+        if not self.q.defered and len(self.listeners) > 0:
+            self.clearButtons()
 
-                log.debug("Populated {}/{}".format(buttonIdx,self.maxIdx))
+            # get the latest call and band info
+            # and update the status message bar
+            self.getLatestInfo()
 
-            now = datetime.now()
-            nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
-            if self.stopping == False:
-                # sleep until the next 1/4 minute + 12sec
-                # that is the start of the next decode cycle
-                self.nextListen = threading.Timer((nextSleep-now).total_seconds()+12,f)
-                self.nextListen.start()
-                log.debug("next listener {} {}".format(type(self.nextListen),self.nextListen))
-        f()
+            # try for 5 seconds to collect decodes 
+            # from all attached listeners
+            # try twice a second
+            # it's cheap
+            # ¿por qué no?
+            buttonIdx = 0
+            seen = {}
+            for seconds in range(10):
+                buttonIdx = self.collectListenerDecodes(buttonIdx, seen)
+                if buttonIdx > self.maxIdx:
+                    break
+                time.sleep(0.5)
 
+            # make sure we start fresh next time if we surpassed the max number of
+            # displayable calls we don't want to show stale info
+            self.clearAllListenerUnseen()
+
+            log.debug("Populated {}/{}".format(buttonIdx,self.maxIdx))
+
+    def loopButtonUpdate(self):
+        self.runButtonUpdate()
+
+        now = datetime.now()
+        nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
+        if self.stopping == False:
+            # sleep until the next 1/4 minute + 12sec
+            # that is the start of the next decode cycle
+            self.nextListen = threading.Timer((nextSleep-now).total_seconds()+12,self.loopButtonUpdate)
+            self.nextListen.start()
+            log.debug("next listener {} {}".format(type(self.nextListen),self.nextListen))
 
 
     def exit(self,signum=None,frame=None):
         try:
+            self.updateStatusMessage(status='Exiting')
             self.q.stopScan()
             self.stopping = True
             if self.nextListen != None:

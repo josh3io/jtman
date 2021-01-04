@@ -14,6 +14,8 @@ config.read(configFile)
 config.add_section('_')
 config.set('_','configFile', configFile)
 
+VERSION = "1.1.0-beta"
+
 
 # set env GUI to zero, or env GUI is unset and GUI disabled in config
 log.debug("GUI {}; {}".format(os.getenv('GUI'),config.get('OPTS','gui',fallback=0)))
@@ -22,7 +24,7 @@ if os.getenv('GUI') == '0' or config.get('OPTS','gui') == 0 or config.get('OPTS'
 else:
     log.debug("gui enabled")
     mainWindow = tk.Tk()
-    mainWindow.title('Jtman alert manager')
+    mainWindow.title('Jtman alert manager v'+VERSION)
     app = JtmanTk(mainWindow, config)
     mainWindow.mainloop()
 

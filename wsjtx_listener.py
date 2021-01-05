@@ -207,9 +207,13 @@ class Listener:
         nd = self.q.needDataByBandAndCall(self.band,self.the_packet.call,self.the_packet.grid)
         log.debug("update_log call {} grid {} needData {}".format(self.the_packet.call,self.the_packet.grid,nd))
         try:
-            qso = { 'CALL': self.the_packet.call, 'DXCC': nd['dx'], 'BAND': self.band }
-            if nd['state'] in nd:
-                qso['STATE'] = nd['state']
+            qso = { 
+                'CALL': self.the_packet.call, 
+                'BAND': self.band,
+                'DXCC': nd.get('dx'),
+                'STATE': nd.get('state'),
+                'GRID': nd.get('grid')
+            }
             self.q.addQso(qso)
         except Exception as e:
             log.error("Failed to update log for call {}, data {}: {}".format(self.the_packet.call,nd,e))

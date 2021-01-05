@@ -66,7 +66,8 @@ class Listener:
     def parse_packet(self):
         if self.q.defered:
             return
-        #print('decode packet ',self.the_packet)
+
+        print('decode packet ',self.the_packet)
         try:
 
             m = re.match(r"^CQ\s(\w{2,3}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
@@ -121,19 +122,42 @@ class Listener:
                 color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
                 self.s.send_packet(self.addr_port, color_pkt)
             else:
-                m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+)", self.the_packet.message)
+                log.debug("checking for a dual-call message")
+                m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+) ([A-Z0-9-]+)", self.the_packet.message)
                 if m:
                     call1 = m.group(1)
                     call2 = m.group(2)
-                    needData1 = self.q.needDataByBandAndCall(self.band,call1)
+                    msg = m.group(3)
+
+                    grid = False
+                    m2 = re.match(r"([A-Z]{2}[0-9]{2})", msg)
+                    if m2:
+                        g = m2.group(1)
+                        if g != "RR73":
+                            grid = g
+
+                    log.debug("found two calls: {} and {}; grid {}".format(call1,call2,grid))
+                    log.debug("get needData for call1 {}, {}, {}".format(self.band,call1,False))
+                    needData1 = self.q.needDataByBandAndCall(self.band,call1,False)
+                    log.debug("needData for call1 retrieved")
                     needData1['call'] = call1
+                    log.debug("needData for call1 assigned")
                     needData1['cq'] = False
-                    needData2 = self.q.needDataByBandAndCall(self.band,call2)
+                    log.debug("needData for call1 cq assigned")
+                    log.debug("needData1 {}".format(needData1))
+                    needData2 = self.q.needDataByBandAndCall(self.band,call2,grid)
                     needData2['call'] = call2
                     needData2['cq'] = False
+                    log.debug("needData2 {}".format(needData2))
                     if needData1['call'] and needData2['call']:
-                        needData2['cuarto'] = 15 * (datetime.now().second // 15)
-                        self.unseen.append(needData2)
+                        cuarto = 15 * datetime.now().second // 15
+                        log.debug("cuarto {}".format(cuarto))
+                        needData2['cuarto'] = cuarto
+                        try:
+                            self.unseen.append(needData2)
+                        except Exception as e:
+                            log.error("failed to append unseen: {}".format(needData2))
+                            raise e
 
             pass
         except TypeError:

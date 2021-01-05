@@ -202,7 +202,7 @@ class Qsos:
         }
 
     def needGrid(self, band, grid):
-        return (not self.qso['grids'].get(grid,False)
+        return grid is not False and (not self.qso['grids'].get(grid,False)
             or not self.qso['bands'][band]['grids'].get(grid,False))
 
     def needCall(self,band,callsign):

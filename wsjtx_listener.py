@@ -70,7 +70,7 @@ class Listener:
         print('decode packet ',self.the_packet)
         try:
 
-            m = re.match(r"^CQ\s(\w{2-4}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
+            m = re.match(r"^CQ\s(\w{2,3}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
             if m:
                 #print("Callsign {}".format(m.group(1)))
                 directed = m.group(1)
@@ -150,7 +150,7 @@ class Listener:
                     needData2['cq'] = False
                     log.debug("needData2 {}".format(needData2))
                     if needData1['call'] and needData2['call']:
-                        cuarto = 15 * datetime.now().second // 15
+                        cuarto = 15 * (datetime.now().second // 15)
                         log.debug("cuarto {}".format(cuarto))
                         needData2['cuarto'] = cuarto
                         try:
@@ -160,8 +160,10 @@ class Listener:
                             raise e
 
             pass
-        except TypeError:
-            log.error("Caught a type error in parsing packet: {}".format(self.the_packet.message))
+        except TypeError as e:
+            log.error("Caught a type error in parsing packet: {}; error {}".format(self.the_packet.message,e))
+        except Exception as e:
+            log.error("caught an error parsing packet: {}; error {}".format(self.the_packet.message,e))
 
     def stop(self):
         log.debug("stopping wsjtx listener")

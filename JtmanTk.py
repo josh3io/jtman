@@ -256,16 +256,16 @@ class Main(tk.Frame):
         band = listener.band
         now = datetime.now()
         nextSleep = datetime(now.year, now.month, now.day, now.hour, now.minute, 15*(now.second // 15),0)
-        curtime = 15*(now.second //15)
-        #log.debug("Processing band {} time {} unseen count {} current buttonIdx {}, max {}".format(band,curtime,len(listener.unseen), buttonIdx, self.maxIdx))
+        now_cuarto = 15*(now.second //15)
+        #log.debug("Processing band {} time {} unseen count {} current buttonIdx {}, max {}".format(band,now_cuarto,len(listener.unseen), buttonIdx, self.maxIdx))
         while len(listener.unseen) > 0 and buttonIdx < self.maxIdx:
             data = listener.unseen.pop(0)
             #log.debug("unseen data {}".format(data))
-            logtime = data['cuarto']
+            log_cuarto = data['cuarto']
             seenstr = data['call'] + band
             isSeen = seen.get(seenstr,False)
-            #log.info("seen {}={} curtime {} logtime {} sum {}".format(seenstr,isSeen,curtime,logtime,curtime+logtime))
-            if not isSeen:
+            log.info("seen {}={} now_cuarto {} log_cuarto {} sum {}".format(seenstr,isSeen,now_cuarto,log_cuarto,now_cuarto+log_cuarto))
+            if not isSeen and log_cuarto == now_cuarto:
                 seen[seenstr] = True
                 log.debug("listener check {}; {}".format(buttonIdx,data))
                 self.updateButton(buttonIdx,listener,data)

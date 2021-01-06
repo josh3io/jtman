@@ -236,7 +236,7 @@ class Qsos:
             return (call_info['adif'],call_info['country'],self.codeByName(call_info['country']))
         except Exception as e:
             log.error("Could not lookup callsign dx: '{}'; {}".format(callsign,e))
-            return (False,False,False)
+            raise "Bad callsign"
 
     def state(self,band,callsign):
         if callsign in self.callstate:

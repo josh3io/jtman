@@ -313,7 +313,7 @@ class Main(tk.Frame):
             # ¿por qué no?
             buttonIdx = 0
             seen = {}
-            for seconds in range(10):
+            for seconds in range(20):
                 buttonIdx = self.collectListenerDecodes(buttonIdx, seen)
                 if buttonIdx > self.maxIdx:
                     break

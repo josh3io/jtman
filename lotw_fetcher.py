@@ -11,15 +11,15 @@ class Fetcher:
         self.cookies = {}
 
     def login(self):
-        log.info("logging into lotw")
+        log.debug("logging into lotw {}, {}".format(self.username,self.password))
         login_data = {'login' : self.username, 'password' : self.password, 'thisForm': 'login'}
         resp = requests.post('https://lotw.arrl.org/lotwuser/lotwreport.adi', data=login_data, cookies=self.cookies)
         log.debug("lotw login {}".format(resp.content))
         self.cookies = resp.cookies
-        log.info("logged into lotw")
+        log.debug("logged into lotw")
 
 
-    def getReport(self,since='1901-01-01',call=''):
+    def getReport(self,since='1915-01-01',call=''):
         report_data = {
             'login' : self.username, 
             'password' : self.password,
@@ -30,11 +30,11 @@ class Fetcher:
             'qso_mydetail': 'yes',
             'qso_owncall': call 
             }
-        log.info("lotw request log")
+        log.debug("lotw request log")
         resp = requests.get('https://lotw.arrl.org/lotwuser/lotwreport.adi', params=report_data, cookies=self.cookies)
-        log.info("lotw log request complete")
+        log.debug("lotw log request complete")
         content = resp.content
         if content.startswith(b'ARRL Logbook of the World Status Report'):
             return resp.content
         else:
-            raise Exception('LOTW request failed. check your credentials. make sure LOTW_USERNAME and LOTW_PASSWORD environment variables are set.')
+            raise Exception('LOTW request failed. {}'.format(content))

@@ -14,14 +14,13 @@ class Listener:
     def __init__(self,q,config,ip_address,port,timeout=2.0):
         log.debug('new listener: '+str(q))
         self.config = config
+        self.call = None
         self.band = None
         self.lastReport = datetime.now()
         self.lastScan = None
         self.q = q
         self.unseen = []
-        self.unlogged = []
         self.stopped = False
-        self.ifttt_key = self.config.get('OPTS','ifttt_key')
         self.ip_address = ip_address
         self.port = port
 
@@ -33,16 +32,25 @@ class Listener:
         if self.config.get('OPTS','load_adif_files_on_start'):
             for filepath in filePaths:
                 self.q.addAdifFile(filepath,True)
-            if self.config.get('LOTW','enable'):
-                username = self.config.get('LOTW','username')
-                password = self.config.get('LOTW','password')
-                if username and password:
-                    self.q.loadLotw(username,password)
+            self.loadLotw()
 
+    def loadLotw(self):
+        if self.config.get('LOTW','enable'):
+            username = self.config.get('LOTW','username')
+            password = self.config.get('LOTW','password')
+            if username and password:
+                self.q.loadLotw(username,password)
 
-    def ifttt_event(self,event):
-        if self.ifttt_key:
-            requests.post('https://maker.ifttt.com/trigger/'+event+'/with/key/'+self.ifttt_key)
+    def webhook_event(self,event):
+        events = self.config.get('WEBHOOKS','events').split(',')
+        for webhook in self.config.get('WEBHOOKS','hooks').splitlines():
+            try:
+                for sendEvent in events:
+                    if event[sendEvent]:
+                        requests.post(webhook, data=event)
+                        break
+            except Exception as e:
+                log.warn('webhook {} failed: event {} error {}'.format(webhook,event,e))
 
     def print_line(self):
         now = datetime.now()
@@ -56,63 +64,106 @@ class Listener:
         self.s.send_packet(data['addr_port'], packet)
 
     def parse_packet(self):
-        #print('decode packet ',self.the_packet)
+        if self.q.defered:
+            return
 
-        m = re.match(r"^CQ\s(\w{2}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
-        if m:
-            #print("Callsign {}".format(m.group(1)))
-            callsign = m.group(2)
-            grid = m.group(4)
-            #print("CALL ",callsign,' on ',self.band)
+        print('decode packet ',self.the_packet)
+        try:
 
-            self.print_line()
-
-            msg = callsign
-            needData = self.q.needDataByBandAndCall(self.band,callsign)
-            needData['call'] = callsign
-            needData['grid'] = grid
-            needData['cq'] = True
-            needData['packet'] = self.the_packet
-            needData['addr_port'] = self.addr_port
-            self.unseen.append(needData)
-
-            if needData['newState'] == True:
-                log.info(colored("NEW STATE {} {}".format(callsign,needData['state']), 'magenta', 'on_white'))
-                bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
-                fg=pywsjtx.QCOLOR.Black()
-                self.ifttt_event('qso_was')
-            elif needData['newDx'] == True:
-                log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
-                bg=pywsjtx.QCOLOR.Red()
-                fg=pywsjtx.QCOLOR.White()
-                self.ifttt_event('qso_dxcc')
-            elif needData['newCall'] == True:
-                log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
-                bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
-                fg=pywsjtx.QCOLOR.White()
-                msg = msg + ' NEW CALL'
-            else:
-                bg=pywsjtx.QCOLOR.Uncolor()
-                fg=pywsjtx.QCOLOR.Uncolor()
-                msg = msg + '_'
-
-            color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
-            self.s.send_packet(self.addr_port, color_pkt)
-        else:
-            m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+)", self.the_packet.message)
+            m = re.match(r"^CQ\s(\w{2,3}\b)?\s?([A-Z0-9/]+)\s([A-Z0-9/]+)?\s?([A-Z]{2}[0-9]{2})", self.the_packet.message)
             if m:
-                call1 = m.group(1)
-                call2 = m.group(2)
-                needData = self.q.needDataByBandAndCall(self.band,call1)
-                needData['call'] = call1
-                needData['cq'] = False
-                self.unseen.append(needData)
-                needData = self.q.needDataByBandAndCall(self.band,call2)
-                needData['call'] = call2
-                needData['cq'] = False
+                #print("Callsign {}".format(m.group(1)))
+                directed = m.group(1)
+                callsign = m.group(2)
+                grid = m.group(4)
+                #print("CALL ",callsign,' on ',self.band)
+
+                self.print_line()
+
+                msg = callsign
+                print("D1")
+                needData = self.q.needDataByBandAndCall(self.band,callsign,grid)
+                print("D2")
+                needData['cuarto'] = 15 * (datetime.now().second // 15)
+                needData['directed'] = directed
+                needData['call'] = callsign
+                needData['grid'] = grid
+                needData['cq'] = True
+                needData['packet'] = self.the_packet
+                needData['addr_port'] = self.addr_port
+                log.debug("listener needData {}".format(needData))
                 self.unseen.append(needData)
 
-        pass
+                threading.Thread(target=self.webhook_event,args=(needData),daemon=True)
+
+                if needData['newState'] == True:
+                    log.info(colored("NEW STATE {} {}".format(callsign,needData['state']), 'magenta', 'on_white'))
+                    bg=pywsjtx.QCOLOR.RGBA(255,255,0,0)
+                    fg=pywsjtx.QCOLOR.Black()
+                elif needData['newDx'] == True:
+                    log.info(colored("NEW DX {} {} {}".format(callsign,needData['dx'],needData['country']), 'red', 'on_white'))
+                    bg=pywsjtx.QCOLOR.Red()
+                    fg=pywsjtx.QCOLOR.White()
+                elif needData['newGrid'] == True:
+                    log.info(colored("NEW GRID {} {} {}".format(callsign,needData['grid'],needData['country']), 'white', 'on_blue'))
+                    bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
+                    fg=pywsjtx.QCOLOR.White()
+                    msg = msg + ' NEW CALL'
+                elif needData['newCall'] == True:
+                    log.info(colored("NEW CALL {} {} {}".format(callsign,needData['state'],needData['country']), 'white', 'on_blue'))
+                    bg=pywsjtx.QCOLOR.RGBA(255,0,0,255)
+                    fg=pywsjtx.QCOLOR.White()
+                    msg = msg + ' NEW CALL'
+                else:
+                    bg=pywsjtx.QCOLOR.Uncolor()
+                    fg=pywsjtx.QCOLOR.Uncolor()
+                    msg = msg + '_'
+
+                color_pkt = pywsjtx.HighlightCallsignPacket.Builder(self.the_packet.wsjtx_id, callsign, bg, fg, True)
+                self.s.send_packet(self.addr_port, color_pkt)
+            else:
+                log.debug("checking for a dual-call message")
+                m = re.match(r"([A-Z0-9/]+) ([A-Z0-9/]+) ([A-Z0-9-]+)", self.the_packet.message)
+                if m:
+                    call1 = m.group(1)
+                    call2 = m.group(2)
+                    msg = m.group(3)
+
+                    grid = False
+                    m2 = re.match(r"([A-Z]{2}[0-9]{2})", msg)
+                    if m2:
+                        g = m2.group(1)
+                        if g != "RR73":
+                            grid = g
+
+                    log.debug("found two calls: {} and {}; grid {}".format(call1,call2,grid))
+                    log.debug("get needData for call1 {}, {}, {}".format(self.band,call1,False))
+                    needData1 = self.q.needDataByBandAndCall(self.band,call1,False)
+                    log.debug("needData for call1 retrieved")
+                    needData1['call'] = call1
+                    log.debug("needData for call1 assigned")
+                    needData1['cq'] = False
+                    log.debug("needData for call1 cq assigned")
+                    log.debug("needData1 {}".format(needData1))
+                    needData2 = self.q.needDataByBandAndCall(self.band,call2,grid)
+                    needData2['call'] = call2
+                    needData2['cq'] = False
+                    log.debug("needData2 {}".format(needData2))
+                    if needData1['call'] and needData2['call']:
+                        cuarto = 15 * (datetime.now().second // 15)
+                        log.debug("cuarto {}".format(cuarto))
+                        needData2['cuarto'] = cuarto
+                        try:
+                            self.unseen.append(needData2)
+                        except Exception as e:
+                            log.error("failed to append unseen: {}".format(needData2))
+                            raise e
+
+            pass
+        except TypeError as e:
+            log.error("Caught a type error in parsing packet: {}; error {}".format(self.the_packet.message,e))
+        except Exception as e:
+            log.error("caught an error parsing packet: {}; error {}".format(self.the_packet.message,e))
 
     def stop(self):
         log.debug("stopping wsjtx listener")
@@ -133,7 +184,7 @@ class Listener:
             self.addr_port = None
 
     def listen(self):
-        self.t = threading.Thread(target=self.doListen)
+        self.t = threading.Thread(target=self.doListen, daemon=True)
         log.info("Listener started "+self.ip_address+":"+str(self.port))
         self.t.start()
 
@@ -145,16 +196,30 @@ class Listener:
         self.s.send_packet(self.addr_port, reply_beat_packet)
 
     def update_status(self):
-        #print('status ',self.the_packet)
+        #log.debug('wsjt-x status {}'.format(self.the_packet))
         try:
             bandinfo = freq_to_band(self.the_packet.dial_frequency/1000)
+            self.call = self.the_packet.de_call
             self.band = str(bandinfo['band'])+'M'
         except Exception as e:
             pass
 
     def update_log(self):
-        log.info("update log".format(self.the_packet))
-        self.unlogged.append(self.the_packet.call)
+        log.debug("update log".format(self.the_packet))
+        nd = self.q.needDataByBandAndCall(self.band,self.the_packet.call,self.the_packet.grid)
+        log.debug("update_log call {} grid {} needData {}".format(self.the_packet.call,self.the_packet.grid,nd))
+        try:
+            qso = { 
+                'CALL': self.the_packet.call, 
+                'BAND': self.band,
+                'DXCC': nd.get('dx'),
+                'STATE': nd.get('state'),
+                'GRID': nd.get('grid')
+            }
+            self.q.addQso(qso)
+        except Exception as e:
+            log.error("Failed to update log for call {}, data {}: {}".format(self.the_packet.call,nd,e))
+            pass
 
     def handle_packet(self):
         if type(self.the_packet) == pywsjtx.HeartBeatPacket:

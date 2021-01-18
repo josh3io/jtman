@@ -7,6 +7,7 @@ import Qsos
 from logger import LOGGER as log
 
 import sys
+
 configFile = os.getenv('CONFIG')
 config = ConfigParser()
 config.read_file(open('config.ini'))

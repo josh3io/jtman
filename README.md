@@ -18,7 +18,12 @@ git submodule update --init --recursive
 ```
 copy config.ini to my_config.ini and update as necessary, then run as above.
 
-Ubuntu 20.04 does not have tkinter installed by default, and requires running
+For installation of required libraries:
 ```bash
-sudo apt install python3-tk
+sudo apt-get install python3-tk
+sudo apt-get install libatlas-base-dev
+pip3 install termcolor
+pip3 install adif_io
+pip3 install pyhamtools
+pip3 install pandas
 ```
